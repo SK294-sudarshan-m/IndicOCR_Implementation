@@ -39,7 +39,7 @@ LOGIN_STEP = (
 class Options:
     dpi: int = 200  # measured in Phase 0: no accuracy gain above 150-200 dpi on the fixtures, ~40% slower at 300
     force_ocr: bool = False
-    pages: str | None = None  # "1-5,8"; applies to PDF pages and TIFF frames
+    pages: str | None = None  # "1-5,8"; applies to PDF pages
     table_format: str = "html"
     device: str = "auto"
     dtype: str = "auto"

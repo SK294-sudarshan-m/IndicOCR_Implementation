@@ -100,7 +100,7 @@ and `a.docx` do not collide):
 | `model_attribution` | `Built with IndicOCR from Bodhan AI / AI4Bharat.` |
 
 Each unit: `index` (0-based position), `kind` (`page`, `sheet`, `section`, `image`), `origin` (`native` or `ocr`), **`reason`**
-(why that path was taken), `status`, `text`, `markdown`, `warnings[]`; plus `page` (1-based, PDF/TIFF/PPTX), `name` (sheet or
+(why that path was taken), `status`, `text`, `markdown`, `warnings[]`; plus `page` (1-based, PDF and PPTX), `name` (sheet or
 image name), and for PDF pages `page_width_pt`, `page_height_pt` and `text_layer` (the metrics behind the decision).
 **OCR units** also carry `render_dpi` (`null` for image files, which are not rendered), `width_px`, `height_px` and `blocks[]`:
 IndicOCR's block records unchanged (`order`, `label`, `type`, `bbox_xyxy`, `conf`, `text`). Boxes are in the pixels of

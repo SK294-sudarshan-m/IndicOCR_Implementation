@@ -34,7 +34,7 @@ class Unit:
     status: str = "ok"  # ok | error
     error_type: str | None = None
     message: str | None = None
-    page: int | None = None  # 1-based, PDF pages and TIFF frames
+    page: int | None = None  # 1-based, PDF pages and PPTX slides
     name: str | None = None  # sheet name, image label
     render_dpi: float | None = None  # null for image files, which are not rendered
     width_px: int | None = None
