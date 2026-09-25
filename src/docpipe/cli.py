@@ -54,7 +54,7 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
         p.add_argument("--model-dir", type=Path, help="IndicOCR model directory (default: ./models/indic-ocr or $DOCPIPE_MODEL_DIR)")
 
-    proc = sub.add_parser("process", help="convert documents to document.json + document.md")
+    proc = sub.add_parser("process", help="convert documents to one document.json each")
     proc.add_argument("inputs", nargs="*", type=Path, default=[Path("input")], metavar="path", help="files or folders (default: ./input)")
     proc.add_argument("--out", type=Path, default=Path("output/ocr_output"), help="output folder, one subfolder per input document (default: ./output/ocr_output)")
     proc.add_argument("--dpi", type=_dpi, default=200, help="render resolution for PDF pages sent to OCR, 50-600 (default 200)")

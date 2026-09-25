@@ -1,7 +1,7 @@
 # docpipe
 
 Local command-line tool and Python library that turns documents into structured text: for every input it writes one
-`document.json` and one reading-ordered `document.md`.
+`document.json` (the units carry their text and a Markdown-formatted `markdown` string; no .md files are written).
 
 Anything that already contains machine-readable text is **parsed natively**. Anything that exists only as pixels
 (scans, photos, image-only PDF pages, pictures embedded in Office files) goes through
@@ -86,10 +86,8 @@ docpipe judge out\ --pdfs pdfs\ --pages-per-pdf 3
 ```
 
 For each PDF, `judge` picks up to 3 OCR pages spread evenly (first, middle, last), sends the page image and IndicOCR's text to
-Claude Sonnet 5, and writes two files (default `output\judge_output\`):
-
-- `judge_summary.md`: a readable table with the OVERALL result in the heading, then per PDF and per page.
-- `judge_report.json`: the same data, with `how_to_read` and `overall` at the top. Field names say what they are:
+Claude Sonnet 5, and writes `judge_report.json` (default `output\judge_output\`). `how_to_read` and `overall_summary` come
+first, and the OVERALL result is also printed to the console. Field names say what they are:
   `llm_quality_rating_out_of_10` (1 = unusable, 10 = perfect; averaged as `average_llm_quality_rating_out_of_10`),
   `llm_verdict` (good / acceptable / poor), `character_accuracy_percent`, `word_accuracy_percent` (and the matching
   `*_error_rate_percent`), `reading_order_correct`, `text_on_page_missing_from_ocr`, `misread_text` (each item has
@@ -119,11 +117,9 @@ Both folders are tracked by git through a `.gitkeep`; their contents are ignored
 
 ## Output
 
-For an input named `report.pdf`, `out\report.pdf\` contains (the folder is named after the full file name so that `a.pdf`
+For an input named `report.pdf`, `out\report.pdf\` contains only `document.json` (the folder is named after the full file name so that `a.pdf`
 and `a.docx` do not collide):
 
-- **`document.md`**: the units' Markdown in reading order, UTF-8. When there are several units each is preceded by an HTML
-  comment such as `<!-- unit 2 | page | page 3 | ocr -->`. Tables from OCR are HTML by default; equations are LaTeX.
 - **`document.json`**: UTF-8, Unicode kept as characters (`ensure_ascii=False`).
 
 | top-level field | meaning |

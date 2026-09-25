@@ -41,11 +41,11 @@ def test_bad_inputs_become_error_records_and_batch_continues(fx, tmp_path, monke
     assert by_name["en_image_only.pdf"].status == "ok" and len(engine.calls) == 2
     assert "needs LibreOffice" in by_name["legacy.doc"].message
 
-    for doc, folder in batch.documents:  # every input, good or bad, gets both files
-        assert (folder / "document.json").is_file() and (folder / "document.md").is_file()
+    for doc, folder in batch.documents:  # every input, good or bad, gets a document.json and nothing else
+        assert (folder / "document.json").is_file() and not list(folder.glob("*.md"))
         assert json.loads((folder / "document.json").read_text(encoding="utf-8"))["status"] == doc.status
-    failed_md = (tmp_path / "out" / "encrypted.pdf" / "document.md").read_text(encoding="utf-8")
-    assert "Processing failed" in failed_md and "PasswordProtected" in failed_md
+    failed = json.loads((tmp_path / "out" / "encrypted.pdf" / "document.json").read_text(encoding="utf-8"))
+    assert failed["status"] == "error" and failed["error_type"] == "PasswordProtected"
 
 
 def test_output_layout_and_json_contents(fx, tmp_path):
@@ -68,17 +68,7 @@ def test_output_layout_and_json_contents(fx, tmp_path):
 
     hindi_raw = (tmp_path / "hi_born_digital.pdf" / "document.json").read_bytes()
     assert "भारत की भाषाएँ".encode("utf-8") in hindi_raw and b"\\u0" not in hindi_raw  # UTF-8, not escapes
-    md = (tmp_path / "hi_born_digital.pdf" / "document.md").read_text(encoding="utf-8")
-    assert md.startswith("भारत की भाषाएँ")
     assert DocumentResult.read(folder / "document.json").to_dict() == data  # JSON round trip
-
-
-def test_markdown_marks_units_only_when_there_are_several(fx, tmp_path):
-    process_batch([fx / "mixed.docx", fx / "hi_born_digital.pdf"], tmp_path, Options(), engine=FakeEngine())
-    multi = (tmp_path / "mixed.docx" / "document.md").read_text(encoding="utf-8")
-    assert "<!-- unit 0 | section | native -->" in multi and "<!-- unit 1 | image" in multi and "| ocr -->" in multi
-    single = (tmp_path / "hi_born_digital.pdf" / "document.md").read_text(encoding="utf-8")
-    assert "<!--" not in single
 
 
 def test_folder_input_recurses_mirrors_structure_and_skips_unsupported(fx, tmp_path):
@@ -92,7 +82,7 @@ def test_folder_input_recurses_mirrors_structure_and_skips_unsupported(fx, tmp_p
     for _ in range(2):
         batch = process_batch([src], out, Options(), engine=FakeEngine())
         assert sorted(d.source for d, _ in batch.documents) == sorted([str(src / "a.pdf"), str(src / "sub" / "b.xlsx")])
-    assert (out / "a.pdf" / "document.json").is_file() and (out / "sub" / "b.xlsx" / "document.md").is_file()
+    assert (out / "a.pdf" / "document.json").is_file() and (out / "sub" / "b.xlsx" / "document.json").is_file()
     assert sorted(p.split("\\")[-1] for p in batch.skipped) == ["notes.bin", "~$lock.docx"]
 
 

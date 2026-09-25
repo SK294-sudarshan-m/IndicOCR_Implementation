@@ -147,37 +147,8 @@ def _summarise(pages: list[dict]) -> dict:
     }
 
 
-def _markdown(report: dict) -> str:
-    o = report["overall_summary"]
-    lines = ["# OCR judge summary", "", f"_{report['how_to_read']}_", "", f"Judge model: `{report['judge_model_name']}`", ""]
-    if o.get("number_of_pages_judged"):
-        lines += [
-            f"## OVERALL: LLM quality rating **{o['average_llm_quality_rating_out_of_10']} / 10**, character accuracy **{o['average_character_accuracy_percent']}%**, word accuracy **{o['average_word_accuracy_percent']}%**",
-            "",
-            f"{o['number_of_pdfs_judged']} PDF(s), {o['number_of_pages_judged']} page(s) judged; verdicts {o['number_of_pages_per_llm_verdict']}; "
-            f"{o['total_llm_input_tokens']} input / {o['total_llm_output_tokens']} output tokens; {o['total_llm_call_latency_seconds']} s of LLM time.",
-            "",
-        ]
-    lines += ["## Per PDF", "", "| PDF | Pages judged | LLM quality rating (avg, out of 10) | Character accuracy (avg %) | Word accuracy (avg %) | Verdicts (good / acceptable / poor) |", "|---|---|---|---|---|---|"]
-    for d in report["pdfs"]:
-        if "error_message" in d and not d["judged_pages"]:
-            lines.append(f"| {d['pdf_name']} | 0 | - | - | - | {d['error_message']} |")
-            continue
-        v = d.get("number_of_pages_per_llm_verdict", {})
-        lines.append(f"| {d['pdf_name']} | {len([j for j in d['judged_pages'] if 'error_message' not in j])} | {d.get('average_llm_quality_rating_out_of_10', '-')} | {d.get('average_character_accuracy_percent', '-')} | {d.get('average_word_accuracy_percent', '-')} | {v.get('good', 0)} / {v.get('acceptable', 0)} / {v.get('poor', 0)} |")
-    lines += ["", "## Per page", "", "| PDF | Page | LLM quality rating (out of 10) | LLM verdict | Character accuracy % | Word accuracy % | Reading order correct | Missing / wrong / invented items | LLM call (s) | Tokens in / out |", "|---|---|---|---|---|---|---|---|---|---|"]
-    for d in report["pdfs"]:
-        for j in d["judged_pages"]:
-            if "error_message" in j:
-                lines.append(f"| {d['pdf_name']} | {j['page_number']} | - | - | - | - | - | ERROR: {j['error_message']} | - | - |")
-            else:
-                lines.append(f"| {d['pdf_name']} | {j['page_number']} | {j['llm_quality_rating_out_of_10']} | {j['llm_verdict']} | {j['character_accuracy_percent']} | {j['word_accuracy_percent']} | {j['reading_order_correct']} | {len(j['text_on_page_missing_from_ocr'])} / {len(j['misread_text'])} / {len(j['text_in_ocr_but_not_on_page'])} | {j['llm_call_latency_seconds']} | {j['llm_input_tokens']} / {j['llm_output_tokens']} |")
-    return "\n".join(lines) + "\n"
-
-
 def run(output_dir: Path, pdfs_dir: Path | None = None, pages_per_pdf: int = 3, model: str = DEFAULT_MODEL, say=print, report_dir: Path | None = None) -> dict:
-    """Judge ``pages_per_pdf`` OCR pages of every PDF result under ``output_dir``. Writes judge_report.json and
-    judge_summary.md to ``report_dir`` (default: ``output_dir``)."""
+    """Judge ``pages_per_pdf`` OCR pages of every PDF result under ``output_dir``. Writes judge_report.json only, to ``report_dir`` (default: ``output_dir``)."""
     if not os.environ.get("ANTHROPIC_API_KEY"):
         raise SystemExit("ANTHROPIC_API_KEY is not set. Create a key at console.anthropic.com, run `setx ANTHROPIC_API_KEY ...` in your own terminal, then open a new terminal.")
     try:
@@ -229,10 +200,9 @@ def run(output_dir: Path, pdfs_dir: Path | None = None, pages_per_pdf: int = 3, 
     report_dir = report_dir or output_dir
     report_dir.mkdir(parents=True, exist_ok=True)
     (report_dir / "judge_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-    (report_dir / "judge_summary.md").write_text(_markdown(report), encoding="utf-8")
     o = report["overall_summary"]
     if all_pages:
         say(f"OVERALL: LLM quality rating {o['average_llm_quality_rating_out_of_10']}/10 | character accuracy {o['average_character_accuracy_percent']}% | word accuracy {o['average_word_accuracy_percent']}% | verdicts {o['number_of_pages_per_llm_verdict']}")
         say(f"         {o['total_llm_input_tokens']} in / {o['total_llm_output_tokens']} out tokens, {o['total_llm_call_latency_seconds']}s LLM time ({o['number_of_pdfs_judged']} PDFs, {o['number_of_pages_judged']} pages)")
-    say(f"reports: {report_dir / 'judge_summary.md'}  and  {report_dir / 'judge_report.json'}")
+    say(f"report: {report_dir / 'judge_report.json'}")
     return report
