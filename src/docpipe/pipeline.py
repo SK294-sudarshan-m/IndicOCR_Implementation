@@ -119,6 +119,10 @@ def process_document(
         "model_load_seconds": round(getattr(engine, "load_seconds", 0.0) - load_before, 2),
         "peak_rss_mb": _peak_rss_mb(),
     }
+    if opts.deterministic:
+        result.timings = {}
+        for unit in result.units:
+            unit.seconds = None
     result.tool_versions = _versions(result.format, bool(ctx and ctx.used_ocr), engine)
     return result
 

@@ -45,6 +45,7 @@ class Options:
     dtype: str = "auto"
     model_dir: Path | None = None
     max_pixels: int = 100_000_000  # per image, and per rendered PDF page
+    deterministic: bool = False  # omit timings/RAM from the output and seed torch, so re-runs give identical files
     min_image_px: int = 32  # embedded images smaller than this on either side are skipped
     thresholds: Thresholds = field(default_factory=Thresholds)
 

@@ -61,6 +61,7 @@ def build_parser() -> argparse.ArgumentParser:
     proc.add_argument("--pages", type=_pages, help="PDF pages / TIFF frames to process, e.g. 1-5,8")
     proc.add_argument("--table-format", choices=["html", "markdown"], default="html")
     proc.add_argument("--max-megapixels", type=float, default=100.0, help="reject images (and lower PDF render dpi) beyond this size")
+    proc.add_argument("--deterministic", action="store_true", help="identical output files on every run: no timings or RAM figures, torch seeded")
     common(proc)
 
     doc = sub.add_parser("doctor", help="check the installation and the model files")
@@ -77,6 +78,7 @@ def _options(args: argparse.Namespace) -> Options:
     if args.command == "process":
         opts.dpi = args.dpi
         opts.force_ocr = args.force_ocr
+        opts.deterministic = args.deterministic
         opts.pages = args.pages
         opts.table_format = args.table_format
         opts.max_pixels = int(args.max_megapixels * 1_000_000)

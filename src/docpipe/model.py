@@ -206,7 +206,12 @@ class IndicOcrEngine:
             return
 
         try:
+            import torch
             from idp_recognizer import HfRecognizer
+
+            if self.opts.deterministic:
+                torch.manual_seed(0)
+                torch.use_deterministic_algorithms(True, warn_only=True)
 
             self._layout = IndicDocLayout(
                 str(model_dir / "weights" / "layout"), LayoutConfig(device=self._device)
