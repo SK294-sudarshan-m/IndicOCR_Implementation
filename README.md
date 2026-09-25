@@ -86,8 +86,16 @@ docpipe judge out\ --pdfs pdfs\ --pages-per-pdf 3
 ```
 
 For each PDF, `judge` picks up to 3 OCR pages spread evenly (first, middle, last), sends the page image and IndicOCR's text to
-Claude Sonnet 5, and writes `out\judge_report.json`: Claude's own transcription, a 1-10 score, a verdict, missing / wrong /
-hallucinated text, reading-order OK, and CER/WER against that transcription. It needs `pip install anthropic` and
+Claude Sonnet 5, and writes two files (default `output\judge_output\`):
+
+- `judge_summary.md`: a readable table with the OVERALL result in the heading, then per PDF and per page.
+- `judge_report.json`: the same data, with `how_to_read` and `overall` at the top. Field names say what they are:
+  `llm_quality_rating_out_of_10` (1 = unusable, 10 = perfect; averaged as `average_llm_quality_rating_out_of_10`),
+  `llm_verdict` (good / acceptable / poor), `character_accuracy_percent`, `word_accuracy_percent` (and the matching
+  `*_error_rate_percent`), `reading_order_correct`, `missing_text`, `wrong_text`, `hallucinated_text`, `llm_transcription`,
+  and per call `llm_call_latency_seconds`, `llm_input_tokens`, `llm_output_tokens`.
+
+Accuracy percentages are measured against the LLM's own transcription, not human ground truth. It needs `pip install anthropic` and
 `ANTHROPIC_API_KEY` in the environment. **Page images leave your machine**: use it only on non-sensitive documents. The judge
 is an LLM, not ground truth; spot-check its verdicts, especially for Hindi and Urdu.
 
