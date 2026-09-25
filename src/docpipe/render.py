@@ -9,7 +9,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .config import Options, select_pages
+from .config import Options
 from .errors import CorruptFile, DocpipeError, ImageTooLarge
 
 
@@ -74,9 +74,9 @@ class ImageFrame:
     error: DocpipeError | None = None  # why, so one bad frame fails only itself
 
 
-def open_image(source, opts: Options, pages: str | None = None) -> Iterator[ImageFrame]:
-    """Yield the frames of an image file or bytes (``pages``: a --pages spec for multi-frame TIFF). Size is
-    checked from the header, before any decode."""
+def open_image(source, opts: Options) -> Iterator[ImageFrame]:
+    """Yield the frames of an image embedded in an Office/HTML file (bytes). Size is checked from the header,
+    before any decode."""
     from PIL import Image, UnidentifiedImageError
 
     previous = Image.MAX_IMAGE_PIXELS
@@ -90,8 +90,7 @@ def open_image(source, opts: Options, pages: str | None = None) -> Iterator[Imag
             raise CorruptFile(f"image could not be opened: {exc}") from None
 
         total = getattr(im, "n_frames", 1)
-        for page_number in select_pages(pages if total > 1 else None, total):  # --pages is about paged documents
-            index = page_number - 1
+        for index in range(total):
             try:
                 im.seek(index)
                 check_pixels(im.width, im.height, opts, f"image frame {index + 1}" if total > 1 else "image")

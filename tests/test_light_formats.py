@@ -1,4 +1,4 @@
-"""PPTX, HTML, Markdown and legacy Office: the 'should' formats."""
+"""PPTX and HTML."""
 
 from __future__ import annotations
 
@@ -25,25 +25,3 @@ def test_html_reads_visible_text_in_order_and_ocrs_local_images(process, engine)
     assert doc.units[2].text == "after the image"
     assert len(engine.calls) == 2  # the relative file and the data: URI
     assert any("remote image not fetched" in w for w in doc.warnings)
-
-
-def test_markdown_passes_through_and_links_are_followed(process, engine):
-    doc = process("notes.md")
-    assert [(u.kind, u.origin) for u in doc.units] == [("section", "native"), ("image", "ocr"), ("section", "native")]
-    assert doc.units[0].markdown.startswith("# Notes") and "`code`" in doc.units[0].markdown
-    assert doc.units[2].text.strip() == "More text."
-    assert len(engine.calls) == 1
-
-
-def test_markdown_without_images_is_one_unit(process, fx):
-    (fx / "plain.md").write_text("# Title\n\ntext ![x](https://example.com/a.png) more\n", encoding="utf-8")
-    doc = process("plain.md")
-    assert len(doc.units) == 1 and doc.units[0].markdown.startswith("# Title")
-    assert any("remote image not fetched" in w for w in doc.warnings)
-
-
-def test_legacy_office_needs_libreoffice(process, monkeypatch):
-    monkeypatch.setattr("shutil.which", lambda name: None)
-    doc = process("legacy.doc")
-    assert doc.status == "error" and doc.error_type == "UnsupportedFormat"
-    assert "unsupported" in doc.message and "needs LibreOffice" in doc.message and ".docx" in doc.message

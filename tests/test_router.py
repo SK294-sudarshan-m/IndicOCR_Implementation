@@ -13,9 +13,9 @@ from docpipe.router import EXTRACTORS, EXTENSIONS, detect_format
 @pytest.mark.parametrize(
     "name, fmt",
     [
-        ("en_born_digital.pdf", "pdf"), ("hi_page.png", "png"), ("hi_photo_exif.jpg", "jpeg"), ("en_two_pages.tif", "tiff"),
+        ("en_born_digital.pdf", "pdf"),
         ("mixed.docx", "docx"), ("book.xlsx", "xlsx"), ("table.csv", "csv"), ("nested.json", "json"), ("note.xml", "xml"),
-        ("plain.txt", "txt"), ("legacy.doc", "doc"),
+        ("plain.txt", "txt"),
     ],
 )
 def test_formats_are_detected(fx, name, fmt):
@@ -27,30 +27,25 @@ def test_every_extension_maps_to_an_extractor():
 
 
 def test_content_wins_over_a_wrong_extension(fx, tmp_path):
-    misnamed = tmp_path / "photo.png"
-    shutil.copy(fx / "hi_photo_exif.jpg", misnamed)
-    fmt, warnings = detect_format(misnamed)
-    assert fmt == "jpeg" and "extension .png says png but the content is jpeg" in warnings[0]
     workbook = tmp_path / "report.docx"
     shutil.copy(fx / "book.xlsx", workbook)
-    assert detect_format(workbook)[0] == "xlsx"
+    fmt, warnings = detect_format(workbook)
+    assert fmt == "xlsx" and "says docx but the content is xlsx" in warnings[0]
 
 
 def test_bad_files_raise_specific_errors(fx, tmp_path):
     with pytest.raises(EmptyFile):
         detect_format(fx / "empty.txt")
-    with pytest.raises(CorruptFile, match="not a valid PNG"):
-        detect_format(fx / "fake.png")
+    fake = tmp_path / "fake.pdf"
+    fake.write_bytes(b"just text")
+    with pytest.raises(CorruptFile, match="not a valid PDF"):
+        detect_format(fake)
     with pytest.raises(CorruptFile):
         detect_format(fx / "corrupt.docx")
     unknown = tmp_path / "data.bin"
     unknown.write_bytes(b"abc")
     with pytest.raises(UnsupportedFormat, match="unsupported file type '.bin'"):
         detect_format(unknown)
-    mail = tmp_path / "x.eml"
-    mail.write_bytes(b"From: a@b\n")
-    with pytest.raises(UnsupportedFormat, match="containers are not supported"):
-        detect_format(mail)
 
 
 def test_zip_archives_and_password_protected_office_files(tmp_path):

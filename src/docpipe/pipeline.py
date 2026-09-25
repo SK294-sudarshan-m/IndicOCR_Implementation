@@ -18,15 +18,14 @@ from .render import Workspace
 from .router import EXTENSIONS, detect_format, get_extractor
 from .schema import DocumentResult
 
-_PAGED = {"pdf", "tiff", "png", "jpeg", "bmp", "webp"}  # single-frame images ignore --pages inside open_image
+_PAGED = {"pdf"}
 _FORMAT_LIBS = {
     "pdf": ["PyMuPDF"],
-    "docx": ["python-docx", "lxml"],
-    "pptx": ["lxml"],
-    "html": ["lxml"],
-    "xlsx": ["openpyxl"],
+    "docx": ["python-docx", "lxml", "Pillow"],
+    "pptx": ["lxml", "Pillow"],
+    "html": ["lxml", "Pillow"],
+    "xlsx": ["openpyxl", "Pillow"],
     "xml": ["lxml"],
-    "png": ["Pillow"], "jpeg": ["Pillow"], "tiff": ["Pillow"], "bmp": ["Pillow"], "webp": ["Pillow"],
 }
 
 
@@ -94,7 +93,7 @@ def process_document(
         result.format, warnings = detect_format(path)
         result.warnings.extend(warnings)
         if opts.pages and result.format not in _PAGED:
-            result.warnings.append(f"--pages applies to PDF pages and multi-frame TIFF frames only; ignored for {result.format}")
+            result.warnings.append(f"--pages applies to PDF pages only; ignored for {result.format}")
         with Workspace() as workspace:
             ctx = Context(opts, workspace, engine, emit=emit)
             units = get_extractor(result.format)(path, ctx)

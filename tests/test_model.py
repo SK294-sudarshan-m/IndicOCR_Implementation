@@ -27,7 +27,6 @@ LIMIT = {
     "hi_broken_legacy.pdf": 0.05,
     "hi_shaped_mupdf.pdf": 0.05,
     "hi_scan_degraded.pdf": 0.08,
-    "hi_photo_exif.jpg": 0.05,
     "docx_image": 0.05,
     "mixed_native_and_scan.pdf": 0.05,
 }
@@ -109,13 +108,6 @@ def test_mixed_pdf_native_page_and_ocr_page(fx, real_engine, measurements):
     native, scanned = doc.units
     assert native.origin == "native" and scanned.origin == "ocr"
     assert record(measurements, "mixed_native_and_scan.pdf", scanned, EN_P2) < LIMIT["mixed_native_and_scan.pdf"]
-
-
-def test_exif_rotated_photo_reads_upright(fx, real_engine, measurements):
-    doc = run(fx, real_engine, "hi_photo_exif.jpg")
-    (unit,) = doc.units
-    assert unit.width_px < unit.height_px
-    assert record(measurements, "hi_photo_exif.jpg", unit, HI_PAGE_TEXT) < LIMIT["hi_photo_exif.jpg"]
 
 
 def test_docx_embedded_image_cer(fx, real_engine, measurements):

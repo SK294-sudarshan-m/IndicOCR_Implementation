@@ -68,9 +68,9 @@ docpipe process scan.pdf --out out\ --force-ocr --table-format markdown
 | `--out DIR` | required | one subfolder per input document |
 | `--dpi N` | 200 | render resolution for PDF pages that go to OCR |
 | `--force-ocr` | off | OCR every PDF page, ignoring text layers |
-| `--pages 1-5,8` | all | PDF pages / multi-frame TIFF frames to process |
+| `--pages 1-5,8` | all | PDF pages to process |
 | `--table-format html\|markdown` | html | how IndicOCR writes tables |
-| `--max-megapixels N` | 100 | reject images above this; lower PDF render dpi to stay under it |
+| `--max-megapixels N` | 100 | reject embedded images above this; lower PDF render dpi to stay under it |
 | `--device auto\|cpu\|cuda` | auto | CUDA if available, else CPU |
 | `--model-dir DIR` | see above | IndicOCR model directory |
 
@@ -115,15 +115,15 @@ Example reasons: `no text layer`, `text layer valid (131 characters)`,
 | Format | Handling |
 |---|---|
 | PDF | per page: text layer if it passes the validity check, otherwise rendered and OCR'd (`--force-ocr` overrides) |
-| PNG, JPEG, TIFF (multi-page), BMP, WEBP | EXIF rotation applied, converted to RGB (transparency flattened onto white), size-checked, OCR'd |
 | DOCX | native paragraphs (headings, lists) and tables in document order; each embedded image OCR'd where it appears |
 | XLSX | one unit per sheet, cached formula values; embedded images OCR'd |
+| PPTX | native slide text and tables in slide order; pictures OCR'd |
+| HTML | native text; local and `data:` images OCR'd; remote images are never fetched |
 | CSV / TSV, TXT | native |
 | JSON, XML | native; pretty-printed in a fenced block, Unicode exact; XML entities and DTDs are not resolved |
-| PPTX | native slide text and tables in slide order; pictures OCR'd |
-| HTML, Markdown | native text; local and `data:` images OCR'd; remote images are never fetched |
-| DOC, XLS, PPT | reported `unsupported: needs LibreOffice` unless `soffice` is on PATH, then converted first |
-| ZIP, email, GIF | not supported; reported |
+
+OCR is used only for pixels: image-only PDF pages and images embedded in DOCX, XLSX, PPTX and HTML. Standalone image
+files, Markdown, legacy DOC/XLS/PPT, ZIP and email are not supported and are reported as errors.
 
 ## The PDF text-layer decision
 
@@ -146,7 +146,14 @@ Pages where the text layer is used are read by PyMuPDF with ligatures expanded a
 Windows 11, Intel i5-1135G7 (4 cores / 8 threads), 15.7 GB RAM, no GPU, torch 2.14.0+cpu, transformers 5.17.0.
 Full numbers are in `progress.txt`.
 
-<<MEASURED>>
+- OCR page (layout + recognizer, fp32): median 9.8 s over 20 pages (5-23 s); first model load 5-18 s.
+- Peak RAM about 5.5 GB (float32; bfloat16 was 3.5 GB but 1.65x slower on this CPU).
+- Render dpi: no accuracy difference from 100 to 300 dpi on the generated pages; 300 dpi is about 40% slower.
+- Accuracy on a real scanned 1972 fax page (1 page, English): CER 0.6%, WER 1.0% against a Claude Sonnet 5
+  transcription; the handwritten signature was missed. Generated Hindi/English pages: CER 0.0000.
+
+`docpipe evaluate document.json --reference reference.txt` prints CER, WER, token F1, throughput and review flags.
+`docpipe.metrics` also has field accuracy, exact match, IoU, reading-order distance and STP/HITL rates.
 
 ## Known limits
 

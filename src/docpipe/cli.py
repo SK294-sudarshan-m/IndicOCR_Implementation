@@ -58,13 +58,17 @@ def build_parser() -> argparse.ArgumentParser:
     proc.add_argument("--out", required=True, type=Path, help="output folder; one subfolder per input document")
     proc.add_argument("--dpi", type=_dpi, default=200, help="render resolution for PDF pages sent to OCR, 50-600 (default 200)")
     proc.add_argument("--force-ocr", action="store_true", help="OCR every PDF page, ignoring text layers")
-    proc.add_argument("--pages", type=_pages, help="PDF pages / TIFF frames to process, e.g. 1-5,8")
+    proc.add_argument("--pages", type=_pages, help="PDF pages to process, e.g. 1-5,8")
     proc.add_argument("--table-format", choices=["html", "markdown"], default="html")
     proc.add_argument("--max-megapixels", type=float, default=100.0, help="reject images (and lower PDF render dpi) beyond this size")
     common(proc)
 
     doc = sub.add_parser("doctor", help="check the installation and the model files")
     common(doc)
+
+    ev = sub.add_parser("evaluate", help="CER, WER, token F1, throughput and review flags for a document.json")
+    ev.add_argument("document_json", type=Path)
+    ev.add_argument("--reference", required=True, type=Path, help="UTF-8 text file with the ground-truth text")
     return parser
 
 
@@ -90,6 +94,15 @@ def _summary(result) -> str:
 def main(argv: list[str] | None = None) -> int:
     _utf8_stdio()
     args = build_parser().parse_args(argv)
+    if args.command == "evaluate":
+        import json
+
+        from .metrics import evaluate
+        from .schema import DocumentResult
+
+        report = evaluate(DocumentResult.read(args.document_json), args.reference.read_text(encoding="utf-8"))
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 0
     opts = _options(args)
 
     if args.command == "doctor":

@@ -16,17 +16,13 @@ BAD = {
     "corrupt.pdf": "CorruptFile",
     "empty.txt": "EmptyFile",
     "encrypted.pdf": "PasswordProtected",
-    "huge.png": "ImageTooLarge",
-    "fake.png": "CorruptFile",
     "corrupt.docx": "CorruptFile",
-    "legacy.doc": "UnsupportedFormat",
     "broken.json": "CorruptFile",
     "missing.pdf": "FileNotFound",
 }
 
 
-def test_bad_inputs_become_error_records_and_batch_continues(fx, tmp_path, monkeypatch):
-    monkeypatch.setattr("shutil.which", lambda name: None)  # no LibreOffice, whatever this machine has
+def test_bad_inputs_become_error_records_and_batch_continues(fx, tmp_path):
     engine = FakeEngine()
     names = [*BAD, "nested.json", "en_born_digital.pdf", "en_image_only.pdf"]  # good files come AFTER the bad ones
     batch = process_batch([fx / n for n in names], tmp_path / "out", Options(), engine=engine)
@@ -40,7 +36,6 @@ def test_bad_inputs_become_error_records_and_batch_continues(fx, tmp_path, monke
     assert by_name["nested.json"].status == "ok"
     assert by_name["en_born_digital.pdf"].status == "ok"
     assert by_name["en_image_only.pdf"].status == "ok" and len(engine.calls) == 2
-    assert "needs LibreOffice" in by_name["legacy.doc"].message
 
     for doc, folder in batch.documents:  # every input, good or bad, gets both files
         assert (folder / "document.json").is_file() and (folder / "document.md").is_file()
@@ -110,7 +105,7 @@ def test_same_name_from_different_folders_does_not_overwrite(fx, tmp_path):
 def test_temp_files_are_removed(fx, tmp_path, monkeypatch):
     monkeypatch.setattr("tempfile.tempdir", str(tmp_path / "tmp"))
     (tmp_path / "tmp").mkdir()
-    names = ["en_image_only.pdf", "mixed.docx", "hi_photo_exif.jpg", "corrupt.pdf", "huge.png", "book_image.xlsx"]
+    names = ["en_image_only.pdf", "mixed.docx", "corrupt.pdf", "book_image.xlsx"]
     engine = FakeEngine(fail_on={2})
     process_batch([fx / n for n in names], tmp_path / "out", Options(), engine=engine)
     assert list((tmp_path / "tmp").iterdir()) == []
@@ -127,7 +122,7 @@ def test_native_only_run_does_not_need_the_model(fx, tmp_path):
     opts = Options(model_dir=tmp_path / "no-such-model-dir")
     batch = process_batch([fx / "nested.json", fx / "en_born_digital.pdf", fx / "book.xlsx"], tmp_path / "out", opts)
     assert [d.status for d, _ in batch.documents] == ["ok", "ok", "ok"]
-    ocr_doc = process_batch([fx / "hi_page.png"], tmp_path / "out2", opts).documents[0][0]
+    ocr_doc = process_batch([fx / "hi_image_only.pdf"], tmp_path / "out2", opts).documents[0][0]
     assert ocr_doc.status == "error" and ocr_doc.error_type == "ModelUnavailable"
     assert "model directory not found" in ocr_doc.message and "fix:" in ocr_doc.message
 
@@ -140,6 +135,6 @@ def test_model_load_failure_is_not_retried_for_every_page(fx, tmp_path, monkeypa
     monkeypatch.setattr(model, "model_dir_problems", lambda *a, **k: attempts.append(1) or real(*a, **k))
     opts = Options(model_dir=tmp_path / "missing")
     engine = model.IndicOcrEngine(opts)
-    doc = process_batch([fx / "en_image_only.pdf", fx / "hi_page.png"], tmp_path / "out", opts, engine=engine).documents[0][0]
+    doc = process_batch([fx / "en_image_only.pdf", fx / "hi_image_only.pdf"], tmp_path / "out", opts, engine=engine).documents[0][0]
     assert doc.status == "error" and doc.error_type == "ModelUnavailable"
     assert len(attempts) == 1, "two pages and a second document must reuse the first load failure"

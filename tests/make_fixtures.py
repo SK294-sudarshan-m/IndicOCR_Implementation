@@ -215,22 +215,6 @@ def build(out: Path) -> dict:
     blank.new_page()
     blank.save(out / "blank.pdf")
 
-    # --- images -------------------------------------------------------------------------------
-    from PIL import Image
-
-    hi_png = hi[0].get_pixmap(dpi=150, alpha=False)
-    hi_img = Image.frombytes("RGB", (hi_png.width, hi_png.height), hi_png.samples)
-    hi_img.save(out / "hi_page.png")
-    truth["hi_page.png"] = {"pages": [HI_PAGE_TEXT]}
-    exif = Image.Exif()
-    exif[0x0112] = 6  # stored sideways; a viewer must rotate it 90 degrees clockwise
-    hi_img.rotate(90, expand=True).save(out / "hi_photo_exif.jpg", exif=exif, quality=92)
-    truth["hi_photo_exif.jpg"] = {"pages": [HI_PAGE_TEXT]}
-    frames = [Image.frombytes("RGB", (p.width, p.height), p.samples) for p in (en[i].get_pixmap(dpi=120, alpha=False) for i in (0, 1))]
-    frames[0].save(out / "en_two_pages.tif", save_all=True, append_images=frames[1:])
-    truth["en_two_pages.tif"] = truth["en_born_digital.pdf"]
-    Image.new("1", (12000, 9000), 1).save(out / "huge.png")  # 108 megapixels
-
     # --- Office and data files ----------------------------------------------------------------
     sentence_doc = _shaped(f"<p>{HI_SENTENCE}</p>", size_pt=16, width=420, height=60, box=(10, 5, 410, 55))
     sentence_png = _png(sentence_doc[0], 200)
@@ -288,7 +272,6 @@ def build(out: Path) -> dict:
         f'<img src="https://example.com/remote.png"><img src="{data_uri}"></body></html>',
         encoding="utf-8",
     )
-    (out / "notes.md").write_text("# Notes\n\nSome text with `code`.\n\n![scan](assets/sentence.png)\n\nMore text.\n", encoding="utf-8")
 
     (out / "table.csv").write_bytes(
         ("नाम,शहर,टिप्पणी\r\nराम,दिल्ली,\"पहली, दूसरी\"\r\nJohn,Mumbai,\"two\nlines\"\r\nx|y,\"a \"\"quoted\"\" word\",ok\r\n").encode("utf-8-sig")
@@ -315,11 +298,9 @@ def build(out: Path) -> dict:
     locked = pymupdf.open()
     locked.new_page().insert_text((60, 80), "secret")
     locked.save(out / "encrypted.pdf", encryption=pymupdf.PDF_ENCRYPT_AES_256, user_pw="secret", owner_pw="owner")
-    (out / "fake.png").write_bytes(b"this is not an image, just text\n")
     (out / "corrupt.docx").write_bytes(b"PK\x03\x04" + bytes(range(256)) * 4)
     (out / "broken.json").write_text('{"a": [1, 2,', encoding="utf-8")
     (out / "broken.xml").write_text("<a><b></a>", encoding="utf-8")
-    (out / "legacy.doc").write_bytes(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + bytes(600))
 
     (out / "truth.json").write_text(json.dumps(truth, ensure_ascii=False, indent=2), encoding="utf-8")
     return truth
