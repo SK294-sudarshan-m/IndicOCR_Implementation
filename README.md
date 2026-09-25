@@ -78,6 +78,19 @@ Folders are searched recursively; unsupported files are listed and skipped. Prog
 document goes to stdout. The exit code is 1 if any document failed (the batch always finishes), otherwise 0.
 Console output is forced to UTF-8, so Devanagari file names print correctly.
 
+### LLM-as-judge (optional, sends images to the Anthropic API)
+
+```powershell
+docpipe process pdfs\ --out out\ --deterministic
+docpipe judge out\ --pdfs pdfs\ --pages-per-pdf 3
+```
+
+For each PDF, `judge` picks up to 3 OCR pages spread evenly (first, middle, last), sends the page image and IndicOCR's text to
+Claude Sonnet 5, and writes `out\judge_report.json`: Claude's own transcription, a 1-10 score, a verdict, missing / wrong /
+hallucinated text, reading-order OK, and CER/WER against that transcription. It needs `pip install anthropic` and
+`ANTHROPIC_API_KEY` in the environment. **Page images leave your machine**: use it only on non-sensitive documents. The judge
+is an LLM, not ground truth; spot-check its verdicts, especially for Hindi and Urdu.
+
 As a library: `from docpipe.pipeline import process_batch; from docpipe.config import Options`.
 
 ## Output

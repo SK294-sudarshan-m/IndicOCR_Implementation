@@ -27,6 +27,7 @@ ocr = [
     "numpy",
     "psutil",
 ]
+judge = ["anthropic"]  # `docpipe judge` only
 dev = ["pytest"]
 
 [project.scripts]

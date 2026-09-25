@@ -70,6 +70,12 @@ def build_parser() -> argparse.ArgumentParser:
     ev = sub.add_parser("evaluate", help="CER, WER, token F1, throughput and review flags for a document.json")
     ev.add_argument("document_json", type=Path)
     ev.add_argument("--reference", required=True, type=Path, help="UTF-8 text file with the ground-truth text")
+
+    jd = sub.add_parser("judge", help="LLM-as-judge: Claude grades sampled OCR pages (sends page images to the Anthropic API)")
+    jd.add_argument("output_dir", type=Path, help="folder produced by `docpipe process` (contains <name>/document.json)")
+    jd.add_argument("--pdfs", type=Path, help="folder with the source PDFs, if their recorded paths no longer exist")
+    jd.add_argument("--pages-per-pdf", type=int, default=3, help="OCR pages sampled per PDF, evenly spread (default 3)")
+    jd.add_argument("--model", default="claude-sonnet-5")
     return parser
 
 
@@ -96,6 +102,11 @@ def _summary(result) -> str:
 def main(argv: list[str] | None = None) -> int:
     _utf8_stdio()
     args = build_parser().parse_args(argv)
+    if args.command == "judge":
+        from . import judge
+
+        judge.run(args.output_dir, args.pdfs, args.pages_per_pdf, args.model, say=lambda m: print(m, flush=True))
+        return 0
     if args.command == "evaluate":
         import json
 
