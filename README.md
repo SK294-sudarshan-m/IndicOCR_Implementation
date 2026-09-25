@@ -99,8 +99,8 @@ Run everything from the project root. `input\` (put documents here) and `output\
 these work with no paths:
 
 ```powershell
-docpipe process                        # input\ -> output\
-docpipe judge --pages-per-pdf 3        # judges output\ against input\
+docpipe process                        # input\ -> output\ocr_output\
+docpipe judge --pages-per-pdf 3        # judges output\ocr_output\ against input\, writes output\judge_output\judge_report.json
 python scripts\fetch_sample_pdfs.py    # optional: download a few small real scanned PDFs into input\
 ```
 
