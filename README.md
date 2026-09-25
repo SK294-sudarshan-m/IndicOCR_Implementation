@@ -68,9 +68,9 @@ docpipe process scan.pdf --out out\ --force-ocr --table-format markdown
 | `--out DIR` | required | one subfolder per input document |
 | `--dpi N` | 200 | render resolution for PDF pages that go to OCR |
 | `--force-ocr` | off | OCR every PDF page, ignoring text layers |
-| `--pages 1-5,8` | all | PDF pages to process |
+| `--pages 1-5,8` | all | PDF pages / multi-frame TIFF frames to process |
 | `--table-format html\|markdown` | html | how IndicOCR writes tables |
-| `--max-megapixels N` | 100 | reject embedded images above this; lower PDF render dpi to stay under it |
+| `--max-megapixels N` | 100 | reject images above this; lower PDF render dpi to stay under it |
 | `--device auto\|cpu\|cuda` | auto | CUDA if available, else CPU |
 | `--model-dir DIR` | see above | IndicOCR model directory |
 
@@ -100,7 +100,7 @@ and `a.docx` do not collide):
 | `model_attribution` | `Built with IndicOCR from Bodhan AI / AI4Bharat.` |
 
 Each unit: `index` (0-based position), `kind` (`page`, `sheet`, `section`, `image`), `origin` (`native` or `ocr`), **`reason`**
-(why that path was taken), `status`, `text`, `markdown`, `warnings[]`; plus `page` (1-based, PDF and PPTX), `name` (sheet or
+(why that path was taken), `status`, `text`, `markdown`, `warnings[]`; plus `page` (1-based, PDF/TIFF/PPTX), `name` (sheet or
 image name), and for PDF pages `page_width_pt`, `page_height_pt` and `text_layer` (the metrics behind the decision).
 **OCR units** also carry `render_dpi` (`null` for image files, which are not rendered), `width_px`, `height_px` and `blocks[]`:
 IndicOCR's block records unchanged (`order`, `label`, `type`, `bbox_xyxy`, `conf`, `text`). Boxes are in the pixels of
@@ -115,15 +115,15 @@ Example reasons: `no text layer`, `text layer valid (131 characters)`,
 | Format | Handling |
 |---|---|
 | PDF | per page: text layer if it passes the validity check, otherwise rendered and OCR'd (`--force-ocr` overrides) |
+| PNG, JPEG, TIFF (multi-page), BMP, WEBP | EXIF rotation applied, converted to RGB (transparency flattened onto white), size-checked, OCR'd |
 | DOCX | native paragraphs (headings, lists) and tables in document order; each embedded image OCR'd where it appears |
 | XLSX | one unit per sheet, cached formula values; embedded images OCR'd |
-| PPTX | native slide text and tables in slide order; pictures OCR'd |
-| HTML | native text; local and `data:` images OCR'd; remote images are never fetched |
 | CSV / TSV, TXT | native |
 | JSON, XML | native; pretty-printed in a fenced block, Unicode exact; XML entities and DTDs are not resolved |
-
-OCR is used only for pixels: image-only PDF pages and images embedded in DOCX, XLSX, PPTX and HTML. Standalone image
-files, Markdown, legacy DOC/XLS/PPT, ZIP and email are not supported and are reported as errors.
+| PPTX | native slide text and tables in slide order; pictures OCR'd |
+| HTML, Markdown | native text; local and `data:` images OCR'd; remote images are never fetched |
+| DOC, XLS, PPT | reported `unsupported: needs LibreOffice` unless `soffice` is on PATH, then converted first |
+| ZIP, email, GIF | not supported; reported |
 
 ## The PDF text-layer decision
 

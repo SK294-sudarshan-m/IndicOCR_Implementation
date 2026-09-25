@@ -106,6 +106,7 @@ def test_bad_dpi_is_rejected(fx, tmp_path):
 def test_pages_is_ignored_with_a_warning_for_unpaged_formats(process):
     doc = process("nested.json", pages="2")
     assert doc.status == "ok" and any("--pages applies to PDF pages" in w for w in doc.warnings)
+    assert process("hi_page.png", pages="3").units, "a single-frame image is not dropped by --pages"
 
 
 def test_process_cli_options_reach_the_pipeline(fx, tmp_path):

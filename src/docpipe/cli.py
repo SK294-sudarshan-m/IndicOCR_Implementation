@@ -58,7 +58,7 @@ def build_parser() -> argparse.ArgumentParser:
     proc.add_argument("--out", required=True, type=Path, help="output folder; one subfolder per input document")
     proc.add_argument("--dpi", type=_dpi, default=200, help="render resolution for PDF pages sent to OCR, 50-600 (default 200)")
     proc.add_argument("--force-ocr", action="store_true", help="OCR every PDF page, ignoring text layers")
-    proc.add_argument("--pages", type=_pages, help="PDF pages to process, e.g. 1-5,8")
+    proc.add_argument("--pages", type=_pages, help="PDF pages / TIFF frames to process, e.g. 1-5,8")
     proc.add_argument("--table-format", choices=["html", "markdown"], default="html")
     proc.add_argument("--max-megapixels", type=float, default=100.0, help="reject images (and lower PDF render dpi) beyond this size")
     common(proc)
