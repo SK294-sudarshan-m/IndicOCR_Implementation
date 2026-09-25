@@ -40,7 +40,7 @@ def check_pixels(width: int, height: int, opts: Options, what: str = "image") ->
     if width * height > opts.max_pixels:
         raise ImageTooLarge(
             f"{what} is {width}x{height} ({width * height / 1e6:.0f} megapixels), over the "
-            f"{opts.max_pixels / 1e6:.0f} MP limit; raise it with --max-pixels or downscale the file"
+            f"{opts.max_pixels / 1e6:.0f} MP limit; raise it with --max-megapixels or downscale the file"
         )
 
 
@@ -116,7 +116,7 @@ class RenderedPage:
     path: Path
     width_px: int
     height_px: int
-    dpi: float
+    dpi: int
     warnings: list[str] = field(default_factory=list)
 
 
@@ -125,7 +125,7 @@ def render_pdf_page(page, requested_dpi: int, opts: Options, workspace: Workspac
     import pymupdf
 
     rect = page.rect
-    dpi = float(requested_dpi)
+    dpi = int(requested_dpi)  # PyMuPDF stores dpi as an integer
     warnings: list[str] = []
     pixels = (rect.width / 72 * dpi) * (rect.height / 72 * dpi)
     if pixels > opts.max_pixels:
@@ -135,7 +135,7 @@ def render_pdf_page(page, requested_dpi: int, opts: Options, workspace: Workspac
                 f"PDF page is {rect.width:.0f}x{rect.height:.0f} pt; it cannot be rendered within "
                 f"{opts.max_pixels / 1e6:.0f} MP at a usable resolution"
             )
-        warnings.append(f"render dpi lowered from {requested_dpi} to {dpi:.0f} to stay within {opts.max_pixels / 1e6:.0f} MP")
+        warnings.append(f"render dpi lowered from {requested_dpi} to {dpi} to stay within {opts.max_pixels / 1e6:.0f} MP")
     pix = page.get_pixmap(dpi=dpi, colorspace=pymupdf.csRGB, alpha=False)
     path = workspace.new_png()
     pix.save(path)

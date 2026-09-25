@@ -38,4 +38,4 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = ["model: needs the real IndicOCR weights (slow on CPU)"]
-addopts = "-m 'not model'"
+addopts = "-m 'not model' --basetemp=.pytest_tmp"
