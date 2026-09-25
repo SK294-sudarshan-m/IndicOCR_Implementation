@@ -93,6 +93,16 @@ is an LLM, not ground truth; spot-check its verdicts, especially for Hindi and U
 
 As a library: `from docpipe.pipeline import process_batch; from docpipe.config import Options`.
 
+## Input and output folders
+
+Run everything from the project root. `input\` (put documents here) and `output\` (results appear here) are the defaults, so
+these work with no paths:
+
+```powershell
+docpipe process                  # input\ -> outputdocpipe judge --pages-per-pdf 3  # judges output\ against inputpython scriptsetch_sample_pdfs.py   # optional: download a few small real scanned PDFs into input```
+
+Both folders are tracked by git through a `.gitkeep`; their contents are ignored so documents and results are never pushed.
+
 ## Output
 
 For an input named `report.pdf`, `out\report.pdf\` contains (the folder is named after the full file name so that `a.pdf`

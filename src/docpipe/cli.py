@@ -55,8 +55,8 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("--model-dir", type=Path, help="IndicOCR model directory (default: ./models/indic-ocr or $DOCPIPE_MODEL_DIR)")
 
     proc = sub.add_parser("process", help="convert documents to document.json + document.md")
-    proc.add_argument("inputs", nargs="+", type=Path, metavar="path", help="files or folders")
-    proc.add_argument("--out", required=True, type=Path, help="output folder; one subfolder per input document")
+    proc.add_argument("inputs", nargs="*", type=Path, default=[Path("input")], metavar="path", help="files or folders (default: ./input)")
+    proc.add_argument("--out", type=Path, default=Path("output"), help="output folder, one subfolder per input document (default: ./output)")
     proc.add_argument("--dpi", type=_dpi, default=200, help="render resolution for PDF pages sent to OCR, 50-600 (default 200)")
     proc.add_argument("--force-ocr", action="store_true", help="OCR every PDF page, ignoring text layers")
     proc.add_argument("--pages", type=_pages, help="PDF pages / TIFF frames to process, e.g. 1-5,8")
@@ -73,8 +73,8 @@ def build_parser() -> argparse.ArgumentParser:
     ev.add_argument("--reference", required=True, type=Path, help="UTF-8 text file with the ground-truth text")
 
     jd = sub.add_parser("judge", help="LLM-as-judge: Claude grades sampled OCR pages (sends page images to the Anthropic API)")
-    jd.add_argument("output_dir", type=Path, help="folder produced by `docpipe process` (contains <name>/document.json)")
-    jd.add_argument("--pdfs", type=Path, help="folder with the source PDFs, if their recorded paths no longer exist")
+    jd.add_argument("output_dir", nargs="?", type=Path, default=Path("output"), help="folder produced by `docpipe process` (default: ./output)")
+    jd.add_argument("--pdfs", type=Path, default=Path("input"), help="folder with the source PDFs if their recorded paths no longer exist (default: ./input)")
     jd.add_argument("--pages-per-pdf", type=int, default=3, help="OCR pages sampled per PDF, evenly spread (default 3)")
     jd.add_argument("--model", default="claude-sonnet-5")
     return parser
