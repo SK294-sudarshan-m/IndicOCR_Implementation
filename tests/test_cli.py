@@ -76,17 +76,17 @@ def test_hindi_output_survives_a_cp1252_stdout(fx, tmp_path):
     control = subprocess.run([sys.executable, "-c", "print('हिंदी')"], capture_output=True, env={**os.environ, **env})
     assert b"UnicodeEncodeError" in control.stderr, "the control must fail, or this test proves nothing"
 
-    proc = run("process", str(fx / "हिंदी_पाठ.txt"), "--out", str(tmp_path / "out"), env=env)
+    proc = run("process", str(fx / "हिंदी_पाठ.pdf"), "--out", str(tmp_path / "out"), env=env)
     assert proc.returncode == 0, text(proc.stderr)
     assert "UnicodeEncodeError" not in text(proc.stderr)
-    assert "हिंदी_पाठ.txt" in text(proc.stdout) and "हिंदी_पाठ.txt" in text(proc.stderr)  # summary and progress lines
-    assert (tmp_path / "out" / "हिंदी_पाठ.txt" / "document.json").is_file()
+    assert "हिंदी_पाठ.pdf" in text(proc.stdout) and "हिंदी_पाठ.pdf" in text(proc.stderr)  # summary and progress lines
+    assert (tmp_path / "out" / "हिंदी_पाठ.pdf" / "document.json").is_file()
 
 
 def test_exit_code_reflects_failures_but_the_batch_finishes(fx, tmp_path):
-    ok = run("process", str(fx / "nested.json"), "--out", str(tmp_path / "a"))
+    ok = run("process", str(fx / "hi_born_digital.pdf"), "--out", str(tmp_path / "a"))
     assert ok.returncode == 0 and "1 document(s): 1 ok, 0 partial, 0 error" in text(ok.stdout)
-    mixed = run("process", str(fx / "corrupt.pdf"), str(fx / "nested.json"), str(fx / "encrypted.pdf"), "--out", str(tmp_path / "b"))
+    mixed = run("process", str(fx / "corrupt.pdf"), str(fx / "hi_born_digital.pdf"), str(fx / "encrypted.pdf"), "--out", str(tmp_path / "b"))
     out = text(mixed.stdout)
     assert mixed.returncode == 1
     assert "3 document(s): 1 ok, 0 partial, 2 error" in out
@@ -94,17 +94,17 @@ def test_exit_code_reflects_failures_but_the_batch_finishes(fx, tmp_path):
 
 
 def test_bad_pages_argument_is_rejected(fx, tmp_path):
-    proc = run("process", str(fx / "nested.json"), "--out", str(tmp_path), "--pages", "3-1")
+    proc = run("process", str(fx / "hi_born_digital.pdf"), "--out", str(tmp_path), "--pages", "3-1")
     assert proc.returncode == 2 and "invalid range" in text(proc.stderr)
 
 
 def test_bad_dpi_is_rejected(fx, tmp_path):
-    proc = run("process", str(fx / "nested.json"), "--out", str(tmp_path), "--dpi", "5")
+    proc = run("process", str(fx / "hi_born_digital.pdf"), "--out", str(tmp_path), "--dpi", "5")
     assert proc.returncode == 2 and "--dpi must be a whole number from 50 to 600" in text(proc.stderr)
 
 
 def test_pages_is_ignored_with_a_warning_for_unpaged_formats(process):
-    doc = process("nested.json", pages="2")
+    doc = process("book.xlsx", pages="2")
     assert doc.status == "ok" and any("--pages applies to PDF pages" in w for w in doc.warnings)
     assert process("hi_page.png", pages="3").units, "a single-frame image is not dropped by --pages"
 

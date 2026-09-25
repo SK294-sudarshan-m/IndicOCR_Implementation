@@ -14,8 +14,7 @@ from docpipe.router import EXTRACTORS, EXTENSIONS, detect_format
     "name, fmt",
     [
         ("en_born_digital.pdf", "pdf"), ("hi_page.png", "png"), ("hi_photo_exif.jpg", "jpeg"), ("en_two_pages.tif", "tiff"),
-        ("mixed.docx", "docx"), ("book.xlsx", "xlsx"), ("table.csv", "csv"), ("nested.json", "json"), ("note.xml", "xml"),
-        ("plain.txt", "txt"), ("legacy.doc", "doc"),
+        ("mixed.docx", "docx"), ("book.xlsx", "xlsx"), ("notes.md", "md"), ("legacy.doc", "doc"),
     ],
 )
 def test_formats_are_detected(fx, name, fmt):

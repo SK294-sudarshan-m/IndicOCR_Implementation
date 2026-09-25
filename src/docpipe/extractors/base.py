@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import codecs
-import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -134,12 +133,6 @@ def decode_text(data: bytes) -> tuple[str, list[str]]:
     return text.replace("\r\n", "\n").replace("\r", "\n"), warnings
 
 
-def fence(text: str, lang: str = "") -> str:
-    longest = max((len(m) for m in re.findall(r"`+", text)), default=0)
-    ticks = "`" * max(3, longest + 1)
-    return f"{ticks}{lang}\n{text}\n{ticks}"
-
-
 def md_table(rows: list[list[str]]) -> str:
     """First row is the header. Cells are escaped so Unicode text and pipes survive."""
     if not rows:
@@ -155,14 +148,3 @@ def md_table(rows: list[list[str]]) -> str:
     lines = ["| " + " | ".join(padded[0]) + " |", "| " + " | ".join(["---"] * width) + " |"]
     lines += ["| " + " | ".join(r) + " |" for r in padded[1:]]
     return "\n".join(lines)
-
-
-_BASE64_IMAGE = re.compile(r"^(?:iVBORw0KGgo|/9j/|R0lGOD|UklGR|data:image/)[A-Za-z0-9+/=;:,._-]{200,}$")
-
-
-def base64_image_warning(strings, where: str = "") -> str | None:
-    """Base64 images inside JSON/XML are out of scope; say so instead of silently ignoring them."""
-    count = sum(1 for s in strings if isinstance(s, str) and len(s) > 200 and _BASE64_IMAGE.match(s.strip()))
-    if count:
-        return f"{count} base64-encoded image(s) found{where}; embedded images in this format are not OCR'd"
-    return None

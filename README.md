@@ -118,12 +118,10 @@ Example reasons: `no text layer`, `text layer valid (131 characters)`,
 | PNG, JPEG, TIFF (multi-page), BMP, WEBP | EXIF rotation applied, converted to RGB (transparency flattened onto white), size-checked, OCR'd |
 | DOCX | native paragraphs (headings, lists) and tables in document order; each embedded image OCR'd where it appears |
 | XLSX | one unit per sheet, cached formula values; embedded images OCR'd |
-| CSV / TSV, TXT | native |
-| JSON, XML | native; pretty-printed in a fenced block, Unicode exact; XML entities and DTDs are not resolved |
 | PPTX | native slide text and tables in slide order; pictures OCR'd |
-| HTML, Markdown | native text; local and `data:` images OCR'd; remote images are never fetched |
+| Markdown | native text; local and `data:` image links OCR'd; remote images are never fetched |
 | DOC, XLS, PPT | reported `unsupported: needs LibreOffice` unless `soffice` is on PATH, then converted first |
-| ZIP, email, GIF | not supported; reported |
+| CSV, HTML, JSON, TXT, XML, ZIP, email, GIF | not supported; reported |
 
 ## The PDF text-layer decision
 

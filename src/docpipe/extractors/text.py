@@ -1,4 +1,4 @@
-"""TXT and Markdown: read as text, unchanged apart from LF line endings. Markdown image links are OCR'd."""
+"""Markdown: read as text, unchanged apart from LF line endings. Local image links are OCR'd."""
 
 from __future__ import annotations
 
@@ -13,9 +13,6 @@ _IMAGE_LINK = re.compile(r"!\[[^\]]*\]\(\s*<?([^)\s>]+)>?[^)]*\)")
 
 def extract(path: Path, ctx: Context) -> list[Unit]:
     text, warnings = decode_text(path.read_bytes())
-    if path.suffix.lower() not in (".md", ".markdown"):
-        return [Unit(0, "section", "native", "plain text file, read directly", text=text, markdown=text, warnings=warnings)]
-
     units: list[Unit] = []
     reason = "Markdown file, read directly"
     cursor = 0

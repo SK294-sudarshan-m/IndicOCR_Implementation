@@ -23,9 +23,7 @@ _FORMAT_LIBS = {
     "pdf": ["PyMuPDF"],
     "docx": ["python-docx", "lxml"],
     "pptx": ["lxml"],
-    "html": ["lxml"],
     "xlsx": ["openpyxl"],
-    "xml": ["lxml"],
     "png": ["Pillow"], "jpeg": ["Pillow"], "tiff": ["Pillow"], "bmp": ["Pillow"], "webp": ["Pillow"],
 }
 

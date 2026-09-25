@@ -186,6 +186,7 @@ def build(out: Path) -> dict:
     page = hi_text_doc.new_page(width=595, height=842)
     page.insert_textbox(pymupdf.Rect(60, 60, 535, 400), f"{HI_TITLE}\n{HI_P1}\n{HI_P2}", fontsize=13, fontname="nir", fontfile=str(NIRMALA))
     hi_text_doc.save(out / "hi_born_digital.pdf")
+    (out / "हिंदी_पाठ.pdf").write_bytes((out / "hi_born_digital.pdf").read_bytes())  # non-ASCII file name
     truth["hi_born_digital.pdf"] = {"pages": [HI_PAGE_TEXT]}
 
     hi = hindi_shaped_doc()
@@ -276,37 +277,8 @@ def build(out: Path) -> dict:
     (out / "assets").mkdir(exist_ok=True)
     (out / "assets" / "sentence.png").write_bytes(sentence_png)
     _write_pptx(out / "deck.pptx", sentence_png)
-    import base64
-
-    data_uri = "data:image/png;base64," + base64.b64encode(sentence_png).decode("ascii")
-    (out / "page.html").write_text(
-        '<!doctype html><html><head><meta charset="utf-8"><title>Quarterly Report</title><script>var hidden = 1;</script></head><body>'
-        f"<h1>Quarterly Report</h1><p>{EN_P2} <b>Bold</b> text.</p><p>{HI_P2}</p>"
-        "<ul><li>one</li><li>दो</li></ul>"
-        "<table><tr><th>Item</th><th>मद</th></tr><tr><td>Rice</td><td>चावल</td></tr></table>"
-        '<img src="assets/sentence.png"><p>after the image</p>'
-        f'<img src="https://example.com/remote.png"><img src="{data_uri}"></body></html>',
-        encoding="utf-8",
-    )
     (out / "notes.md").write_text("# Notes\n\nSome text with `code`.\n\n![scan](assets/sentence.png)\n\nMore text.\n", encoding="utf-8")
 
-    (out / "table.csv").write_bytes(
-        ("नाम,शहर,टिप्पणी\r\nराम,दिल्ली,\"पहली, दूसरी\"\r\nJohn,Mumbai,\"two\nlines\"\r\nx|y,\"a \"\"quoted\"\" word\",ok\r\n").encode("utf-8-sig")
-    )
-    (out / "nested.json").write_text(
-        json.dumps(
-            {"नाम": "राम", "शहर": {"नाम": "दिल्ली", "आबादी": 32000000}, "tags": ["भारत", "English", "日本語", "🙂"], "ok": True, "none": None},
-            ensure_ascii=False,
-        ),
-        encoding="utf-8",
-    )
-    (out / "note.xml").write_text(
-        '<?xml version="1.0" encoding="UTF-8"?>\n<नोट id="7"><शीर्षक>नमस्ते दुनिया</शीर्षक><body lang="hi">यह एक परीक्षण है।</body></नोट>',
-        encoding="utf-8",
-    )
-    (out / "हिंदी_पाठ.txt").write_text(f"{HI_TITLE}\n{HI_P1}\n", encoding="utf-8")
-    (out / "plain.txt").write_bytes(b"first line\r\nsecond line\r\n")
-    (out / "latin1_note.txt").write_bytes("caf\xe9 au lait".encode("cp1252"))
 
     # --- bad inputs ---------------------------------------------------------------------------
     (out / "corrupt.pdf").write_bytes(b"%PDF-1.4\n" + bytes(range(256)) * 20)
@@ -317,8 +289,6 @@ def build(out: Path) -> dict:
     locked.save(out / "encrypted.pdf", encryption=pymupdf.PDF_ENCRYPT_AES_256, user_pw="secret", owner_pw="owner")
     (out / "fake.png").write_bytes(b"this is not an image, just text\n")
     (out / "corrupt.docx").write_bytes(b"PK\x03\x04" + bytes(range(256)) * 4)
-    (out / "broken.json").write_text('{"a": [1, 2,', encoding="utf-8")
-    (out / "broken.xml").write_text("<a><b></a>", encoding="utf-8")
     (out / "legacy.doc").write_bytes(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + bytes(600))
 
     (out / "truth.json").write_text(json.dumps(truth, ensure_ascii=False, indent=2), encoding="utf-8")

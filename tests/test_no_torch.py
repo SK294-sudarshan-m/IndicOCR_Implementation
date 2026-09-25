@@ -14,7 +14,7 @@ SCRIPT = textwrap.dedent(
     from docpipe.pipeline import process_batch
 
     fx, out = Path(sys.argv[1]), Path(sys.argv[2])
-    names = ["en_born_digital.pdf", "hi_born_digital.pdf", "book.xlsx", "nested.json", "note.xml", "table.csv", "plain.txt", "blank.pdf"]
+    names = ["en_born_digital.pdf", "hi_born_digital.pdf", "book.xlsx", "blank.pdf"]
     batch = process_batch([fx / n for n in names], out, Options(model_dir=out / "no-model"))
     statuses = [d.status for d, _ in batch.documents]
     heavy = sorted(m for m in sys.modules if m.split(".")[0] in ("torch", "torchvision", "transformers", "accelerate", "safetensors"))

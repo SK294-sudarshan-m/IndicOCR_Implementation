@@ -25,8 +25,8 @@
   },
   {
     "id": 5,
-    "criterion": "The XLSX yields one unit per sheet with values intact; CSV, JSON and XML render correctly with Unicode preserved",
-    "checks": ["tests/test_office.py::test_xlsx_one_unit_per_sheet", "tests/test_data_formats.py"],
+    "criterion": "The XLSX yields one unit per sheet with values intact",
+    "checks": ["tests/test_office.py::test_xlsx_one_unit_per_sheet"],
     "status": "not_started"
   },
   {

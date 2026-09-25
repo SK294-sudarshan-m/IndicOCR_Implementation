@@ -20,12 +20,7 @@ EXTRACTORS: dict[str, tuple[str, str]] = {
     "docx": ("docx", "extract"),
     "xlsx": ("xlsx", "extract"),
     "pptx": ("pptx", "extract"),
-    "csv": ("csv_", "extract"),
-    "json": ("json_", "extract"),
-    "xml": ("xml_", "extract"),
-    "txt": ("text", "extract"),
     "md": ("text", "extract"),
-    "html": ("html", "extract"),
     "doc": ("legacy", "extract"),
     "xls": ("legacy", "extract"),
     "ppt": ("legacy", "extract"),
@@ -33,13 +28,12 @@ EXTRACTORS: dict[str, tuple[str, str]] = {
 
 EXTENSIONS = {
     ".pdf": "pdf", ".png": "png", ".jpg": "jpeg", ".jpeg": "jpeg", ".tif": "tiff", ".tiff": "tiff",
-    ".bmp": "bmp", ".webp": "webp", ".docx": "docx", ".xlsx": "xlsx", ".pptx": "pptx", ".csv": "csv",
-    ".tsv": "csv", ".json": "json", ".xml": "xml", ".txt": "txt", ".md": "md", ".markdown": "md",
-    ".html": "html", ".htm": "html", ".doc": "doc", ".xls": "xls", ".ppt": "ppt",
+    ".bmp": "bmp", ".webp": "webp", ".docx": "docx", ".xlsx": "xlsx", ".pptx": "pptx", ".md": "md", ".markdown": "md",
+    ".doc": "doc", ".xls": "xls", ".ppt": "ppt",
 }
 _OFFICE_ZIP = {"docx": "word/document.xml", "xlsx": "xl/workbook.xml", "pptx": "ppt/presentation.xml"}
 _OLE = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
-_TEXT_FORMATS = {"csv", "json", "xml", "txt", "md", "html"}
+_TEXT_FORMATS = {"md"}
 
 
 def get_extractor(fmt: str) -> Callable:
