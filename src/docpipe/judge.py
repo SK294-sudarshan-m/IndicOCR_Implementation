@@ -11,6 +11,7 @@ import json
 import os
 import re
 import statistics
+import time
 from pathlib import Path
 
 from .metrics import cer, wer
@@ -69,6 +70,7 @@ def _parse(text: str) -> dict:
 
 
 def judge_page(client, model: str, png: bytes, ocr_text: str) -> dict:
+    started = time.perf_counter()
     message = client.messages.create(
         model=model,
         max_tokens=16000,
@@ -82,10 +84,13 @@ def judge_page(client, model: str, png: bytes, ocr_text: str) -> dict:
             }
         ],
     )
+    latency = round(time.perf_counter() - started, 2)
+    usage = {"latency_s": latency, "input_tokens": message.usage.input_tokens, "output_tokens": message.usage.output_tokens}
     if message.stop_reason == "max_tokens":
-        raise ValueError("the judge's reply was cut off (page too dense for max_tokens)")
+        raise ValueError(f"the judge's reply was cut off (page too dense for max_tokens); {latency}s, {usage['input_tokens']} in / {usage['output_tokens']} out tokens")
     verdict = _parse("".join(b.text for b in message.content if b.type == "text"))
     transcription = verdict.get("transcription", "")
+    verdict.update(usage)
     verdict["cer_vs_transcription"] = round(cer(transcription, ocr_text), 4)
     verdict["wer_vs_transcription"] = round(wer(transcription, ocr_text), 4)
     return verdict
@@ -131,17 +136,21 @@ def run(output_dir: Path, pdfs_dir: Path | None = None, pages_per_pdf: int = 3, 
         else:
             for unit in chosen:
                 item = {"page": unit.page}
+                say(f"  {entry['document']} p{unit.page}: calling {model} ...")
                 try:
                     item.update(judge_page(client, model, _render(pdf, unit.page), unit.text))
                 except Exception as exc:  # one failed page must not stop the run
                     item["error"] = f"{type(exc).__name__}: {str(exc)[:200]}"
                 entry["judged"].append(item)
-                say(f"  {entry['document']} p{unit.page}: " + (item.get("error") or f"score {item.get('score')} {item.get('verdict')} CER {item['cer_vs_transcription']} WER {item['wer_vs_transcription']}"))
+                say(f"  {entry['document']} p{unit.page}: " + (item.get("error") or f"score {item.get('score')} {item.get('verdict')} CER {item['cer_vs_transcription']} WER {item['wer_vs_transcription']} | {item['latency_s']}s, {item['input_tokens']} in / {item['output_tokens']} out tokens"))
         ok = [j for j in entry["judged"] if "error" not in j]
         if ok:
             entry["mean_score"] = round(statistics.mean(j["score"] for j in ok), 2)
             entry["mean_cer"] = round(statistics.mean(j["cer_vs_transcription"] for j in ok), 4)
             entry["mean_wer"] = round(statistics.mean(j["wer_vs_transcription"] for j in ok), 4)
+            entry["total_input_tokens"] = sum(j["input_tokens"] for j in ok)
+            entry["total_output_tokens"] = sum(j["output_tokens"] for j in ok)
+            entry["mean_latency_s"] = round(statistics.mean(j["latency_s"] for j in ok), 2)
         report["documents"].append(entry)
 
     scored = [d for d in report["documents"] if "mean_score" in d]
@@ -151,6 +160,9 @@ def run(output_dir: Path, pdfs_dir: Path | None = None, pages_per_pdf: int = 3, 
         "mean_score": round(statistics.mean(d["mean_score"] for d in scored), 2) if scored else None,
         "mean_cer": round(statistics.mean(d["mean_cer"] for d in scored), 4) if scored else None,
         "mean_wer": round(statistics.mean(d["mean_wer"] for d in scored), 4) if scored else None,
+        "total_input_tokens": sum(d["total_input_tokens"] for d in scored),
+        "total_output_tokens": sum(d["total_output_tokens"] for d in scored),
+        "total_latency_s": round(sum(j["latency_s"] for d in scored for j in d["judged"] if "error" not in j), 2),
     }
     (output_dir / "judge_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     say(f"overall: {report['overall']}  -> {output_dir / 'judge_report.json'}")

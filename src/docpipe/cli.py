@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 from pathlib import Path
 
 from . import __version__
@@ -125,8 +126,11 @@ def main(argv: list[str] | None = None) -> int:
 
     from .pipeline import process_batch
 
+    started = time.perf_counter()
+
     def emit(message: str) -> None:
-        print(message, file=sys.stderr, flush=True)
+        elapsed = int(time.perf_counter() - started)
+        print(f"[{elapsed // 60:02d}:{elapsed % 60:02d}] {message}", file=sys.stderr, flush=True)
 
     def report(n: int, total: int, result, folder: Path) -> None:
         print(f"{result.status:<8} {result.source}  ->  {folder}  {_summary(result)}", flush=True)

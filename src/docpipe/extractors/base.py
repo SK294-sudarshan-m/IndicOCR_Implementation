@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import codecs
+import threading
 import time
 from collections.abc import Callable
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -24,6 +26,23 @@ class Context:
     emit: Callable[[str], None] = lambda message: None
     ocr_seconds: float = 0.0
     used_ocr: bool = False
+
+
+@contextmanager
+def _heartbeat(emit: Callable[[str], None], label: str, interval: float = 15.0):
+    """Print elapsed time every ``interval`` seconds while a slow call runs, so the console never looks frozen."""
+    stop, t0 = threading.Event(), time.perf_counter()
+
+    def beat() -> None:
+        while not stop.wait(interval):
+            emit(f"    {label} ... {time.perf_counter() - t0:.0f}s elapsed")
+
+    thread = threading.Thread(target=beat, daemon=True)
+    thread.start()
+    try:
+        yield
+    finally:
+        stop.set()
 
 
 def error_unit(exc: Exception, kind: str, origin: str, reason: str, **fields) -> Unit:
@@ -50,7 +69,8 @@ def ocr_unit(
     ctx.used_ocr = True
     started = time.perf_counter()
     try:
-        page = ctx.engine.recognize(str(png_path))
+        with _heartbeat(ctx.emit, "OCR running"):
+            page = ctx.engine.recognize(str(png_path))
     except Exception as exc:  # per-unit isolation: a bad page must not stop the document or the batch
         unit.status = "error"
         unit.error_type = exc.error_type if isinstance(exc, DocpipeError) else type(exc).__name__
@@ -65,6 +85,7 @@ def ocr_unit(
             unit.warnings.append("OCR found no text")
     unit.seconds = round(time.perf_counter() - started, 2)
     ctx.ocr_seconds += unit.seconds
+    ctx.emit(f"    OCR {'done' if unit.status == 'ok' else 'FAILED'} in {unit.seconds}s" + (f" ({len(unit.blocks)} blocks)" if unit.blocks else ""))
     return unit
 
 
