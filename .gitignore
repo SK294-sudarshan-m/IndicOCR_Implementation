@@ -13,3 +13,11 @@ input/*
 output/*
 !input/.gitkeep
 !output/.gitkeep
+
+# keep the two result folders tracked (contents ignored)
+!output/ocr_output/
+!output/judge_output/
+output/ocr_output/*
+output/judge_output/*
+!output/ocr_output/.gitkeep
+!output/judge_output/.gitkeep

@@ -103,7 +103,7 @@ def _find_pdf(document: DocumentResult, pdfs_dir: Path | None) -> Path | None:
     return None
 
 
-def run(output_dir: Path, pdfs_dir: Path | None = None, pages_per_pdf: int = 3, model: str = DEFAULT_MODEL, say=print) -> dict:
+def run(output_dir: Path, pdfs_dir: Path | None = None, pages_per_pdf: int = 3, model: str = DEFAULT_MODEL, say=print, report_dir: Path | None = None) -> dict:
     """Judge ``pages_per_pdf`` OCR pages of every PDF result under ``output_dir``. Writes judge_report.json there."""
     if not os.environ.get("ANTHROPIC_API_KEY"):
         raise SystemExit("ANTHROPIC_API_KEY is not set. Create a key at console.anthropic.com, run `setx ANTHROPIC_API_KEY ...` in your own terminal, then open a new terminal.")
@@ -164,8 +164,10 @@ def run(output_dir: Path, pdfs_dir: Path | None = None, pages_per_pdf: int = 3, 
         "total_output_tokens": sum(d["total_output_tokens"] for d in scored),
         "total_latency_s": round(sum(j["latency_s"] for d in scored for j in d["judged"] if "error" not in j), 2),
     }
-    (output_dir / "judge_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-    say(f"overall: {report['overall']}  -> {output_dir / 'judge_report.json'}")
+    report_dir = report_dir or output_dir
+    report_dir.mkdir(parents=True, exist_ok=True)
+    (report_dir / "judge_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    say(f"overall: {report['overall']}  -> {report_dir / 'judge_report.json'}")
     return report
 
 

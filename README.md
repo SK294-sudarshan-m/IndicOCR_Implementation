@@ -95,7 +95,7 @@ As a library: `from docpipe.pipeline import process_batch; from docpipe.config i
 
 ## Input and output folders
 
-Run everything from the project root. `input\` (put documents here) and `output\` (results appear here) are the defaults, so
+Run everything from the project root. `input\` (put documents here) and `output\` are the defaults: OCR results go to `output\ocr_output\`, the judge report to `output\judge_output\`, so
 these work with no paths:
 
 ```powershell
