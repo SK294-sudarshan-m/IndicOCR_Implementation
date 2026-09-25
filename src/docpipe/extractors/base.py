@@ -75,6 +75,8 @@ def ocr_embedded_image(ctx: Context, blob: bytes, *, name: str, reason: str) -> 
         frame = next(open_image(blob, ctx.opts))
     except DocpipeError as exc:
         return error_unit(exc, "image", "ocr", reason, name=name)
+    if frame.error is not None:
+        return error_unit(frame.error, "image", "ocr", reason, name=name)
     w, h = frame.image.size
     if min(w, h) < ctx.opts.min_image_px:
         ctx.warnings.append(f"skipped {name}: only {w}x{h} px")

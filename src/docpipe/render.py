@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .config import Options, select_pages
-from .errors import CorruptFile, ImageTooLarge
+from .errors import CorruptFile, DocpipeError, ImageTooLarge
 
 
 class Workspace:
@@ -70,8 +70,8 @@ def normalize(im):
 class ImageFrame:
     index: int  # 0-based frame number
     total: int
-    image: object  # PIL.Image.Image, RGB, upright
-    warnings: list[str] = field(default_factory=list)
+    image: object | None  # PIL.Image.Image, RGB, upright; None when this frame could not be read
+    error: DocpipeError | None = None  # why, so one bad frame fails only itself
 
 
 def open_image(source, opts: Options, pages: str | None = None) -> Iterator[ImageFrame]:
@@ -96,11 +96,14 @@ def open_image(source, opts: Options, pages: str | None = None) -> Iterator[Imag
                 im.seek(index)
                 check_pixels(im.width, im.height, opts, f"image frame {index + 1}" if total > 1 else "image")
                 im.load()
-            except ImageTooLarge:
-                raise
+                image = normalize(im)
+            except ImageTooLarge as exc:
+                yield ImageFrame(index, total, None, exc)
+                continue
             except (OSError, ValueError, SyntaxError, EOFError) as exc:
-                raise CorruptFile(f"image frame {index + 1} is damaged: {exc}") from None
-            yield ImageFrame(index, total, normalize(im))
+                yield ImageFrame(index, total, None, CorruptFile(f"image frame {index + 1} is damaged: {exc}"))
+                continue
+            yield ImageFrame(index, total, image)
     finally:
         Image.MAX_IMAGE_PIXELS = previous
 

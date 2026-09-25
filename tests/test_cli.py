@@ -59,6 +59,7 @@ def test_doctor_names_the_hf_login_step_when_only_the_ocr_weights_are_missing(tm
     assert "OCR weights missing" in out and "hf auth login" in out and "hf download bodhan-ai/indic-ocr" in out
     assert "--revision cd50d301d0e17e8ecb32fc49c8ccbd7914dcfc25" in out
     assert "layout weights missing" not in out
+    assert "weights/ocr/model-00001-of-00001.safetensors --revision" in out
 
 
 @pytest.mark.model

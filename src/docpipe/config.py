@@ -29,8 +29,9 @@ MODEL_CODE_FILES = (
     "idp_model_order_loss.py",
     "idp_model_ppdoc.py",
 )
-DOWNLOAD_COMMAND = (
-    f"hf download {MODEL_REPO} {OCR_WEIGHTS} --revision {MODEL_REVISION} --local-dir {{model_dir}}"
+DOWNLOAD_COMMAND = f"hf download {MODEL_REPO} {{file}} --revision {MODEL_REVISION} --local-dir {{model_dir}}"
+LOGIN_STEP = (
+    f"run `hf auth login` in your own terminal (the model is gated: accept the license on huggingface.co/{MODEL_REPO})"
 )
 
 

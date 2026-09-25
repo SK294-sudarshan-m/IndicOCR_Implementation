@@ -52,6 +52,21 @@ def test_oversized_image_is_rejected_before_decoding(process, engine):
     assert Image.MAX_IMAGE_PIXELS == 89478485  # Pillow's own guard is restored
 
 
+def test_an_oversized_tiff_frame_fails_that_frame_not_the_earlier_ones(tmp_path):
+    from fakes import FakeEngine
+
+    from docpipe.pipeline import process_document
+
+    path = tmp_path / "mixed_sizes.tif"
+    small, big = Image.new("RGB", (300, 300), "white"), Image.new("RGB", (600, 600), "white")
+    small.save(path, save_all=True, append_images=[big])
+    engine = FakeEngine()
+    doc = process_document(path, "mixed_sizes.tif", Options(max_pixels=200_000), engine)
+    assert doc.status == "partial"
+    assert [(u.page, u.status) for u in doc.units] == [(1, "ok"), (2, "error")]
+    assert doc.units[1].error_type == "ImageTooLarge" and len(engine.calls) == 1
+
+
 def test_pixel_cap_is_configurable(process):
     doc = process("hi_page.png", max_pixels=1_000_000)
     assert doc.status == "error" and doc.error_type == "ImageTooLarge"

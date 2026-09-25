@@ -18,8 +18,8 @@ from typing import Protocol
 from .config import (
     DOWNLOAD_COMMAND,
     LAYOUT_WEIGHTS,
+    LOGIN_STEP,
     MODEL_CODE_FILES,
-    MODEL_REPO,
     MODEL_REVISION,
     OCR_WEIGHTS,
     Options,
@@ -85,32 +85,20 @@ def model_dir_problems(model_dir: Path, code_only: bool = False) -> list[Problem
         )
     if code_only:
         return problems
-    layout = model_dir / LAYOUT_WEIGHTS
-    if not layout.is_file():
-        problems.append(
-            Problem(
-                f"layout weights missing: {layout}",
-                f"copy weights/layout from the reference clone, or: {DOWNLOAD_COMMAND.format(model_dir=model_dir).replace(OCR_WEIGHTS, LAYOUT_WEIGHTS)}",
-            )
-        )
+    for label, weight in (("layout", LAYOUT_WEIGHTS), ("OCR", OCR_WEIGHTS)):
+        path = model_dir / weight
+        download = DOWNLOAD_COMMAND.format(file=weight, model_dir=model_dir)
+        if not path.is_file():
+            problems.append(Problem(f"{label} weights missing: {path}", f"{LOGIN_STEP}, then: {download}"))
     ocr = model_dir / OCR_WEIGHTS
-    if not ocr.is_file():
+    expected = _expected_ocr_bytes(model_dir)
+    if ocr.is_file() and expected and ocr.stat().st_size < expected:
         problems.append(
             Problem(
-                f"OCR weights missing: {ocr}",
-                "run `hf auth login` in your own terminal (the model is gated: accept the license on "
-                f"huggingface.co/{MODEL_REPO}), then: {DOWNLOAD_COMMAND.format(model_dir=model_dir)}",
+                f"OCR weights look truncated ({ocr.stat().st_size} bytes, expected at least {expected})",
+                f"delete {ocr}, then: {DOWNLOAD_COMMAND.format(file=OCR_WEIGHTS, model_dir=model_dir)}",
             )
         )
-    else:
-        expected = _expected_ocr_bytes(model_dir)
-        if expected and ocr.stat().st_size < expected:
-            problems.append(
-                Problem(
-                    f"OCR weights look truncated ({ocr.stat().st_size} bytes, expected at least {expected})",
-                    f"delete {ocr} and re-run: {DOWNLOAD_COMMAND.format(model_dir=model_dir)}",
-                )
-            )
     return problems
 
 
