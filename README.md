@@ -99,7 +99,10 @@ Run everything from the project root. `input\` (put documents here) and `output\
 these work with no paths:
 
 ```powershell
-docpipe process                  # input\ -> outputdocpipe judge --pages-per-pdf 3  # judges output\ against inputpython scriptsetch_sample_pdfs.py   # optional: download a few small real scanned PDFs into input```
+docpipe process                        # input\ -> output\
+docpipe judge --pages-per-pdf 3        # judges output\ against input\
+python scripts\fetch_sample_pdfs.py    # optional: download a few small real scanned PDFs into input\
+```
 
 Both folders are tracked by git through a `.gitkeep`; their contents are ignored so documents and results are never pushed.
 
