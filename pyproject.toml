@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "docpipe"
+version = "0.1.0"
+description = "Local ingestion router: reads machine-readable documents natively and sends pixels to IndicOCR."
+readme = "README.md"
+requires-python = ">=3.11"   # IndicOCR's own code uses enum.StrEnum
+dependencies = [
+    "PyMuPDF",       # PDF text layers, page rendering
+    "python-docx",   # DOCX
+    "openpyxl",      # XLSX
+    "lxml",          # XML, HTML, PPTX
+    "Pillow",        # image normalisation
+]
+
+[project.optional-dependencies]
+# Only needed for the OCR path. Native-only runs never import any of these.
+ocr = [
+    "torch",
+    "torchvision",
+    "transformers>=5.7",
+    "accelerate>=1.1",
+    "huggingface_hub>=1.0",
+    "numpy",
+    "psutil",
+]
+dev = ["pytest"]
+
+[project.scripts]
+docpipe = "docpipe.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["model: needs the real IndicOCR weights (slow on CPU)"]
+addopts = "-m 'not model'"

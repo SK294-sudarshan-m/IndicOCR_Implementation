@@ -1,0 +1,138 @@
+"""Pieces every extractor shares: the run context, the OCR-unit builder, encoding and Markdown helpers."""
+
+from __future__ import annotations
+
+import codecs
+import re
+import time
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from ..config import Options
+from ..errors import CorruptFile, DocpipeError
+from ..model import OcrEngine
+from ..render import Workspace, open_image, save_png
+from ..schema import Unit
+
+
+@dataclass
+class Context:
+    opts: Options
+    workspace: Workspace
+    engine: OcrEngine
+    warnings: list[str] = field(default_factory=list)  # document-level
+    emit: Callable[[str], None] = lambda message: None
+    ocr_seconds: float = 0.0
+    used_ocr: bool = False
+
+
+def error_unit(exc: Exception, kind: str, origin: str, reason: str, **fields) -> Unit:
+    unit = Unit(index=0, kind=kind, origin=origin, reason=reason, status="error", **fields)
+    if isinstance(exc, DocpipeError):
+        unit.error_type, unit.message = exc.error_type, exc.message
+    else:
+        unit.error_type, unit.message = type(exc).__name__, str(exc)
+    return unit
+
+
+def ocr_unit(
+    ctx: Context,
+    png_path: Path,
+    *,
+    kind: str,
+    reason: str,
+    render_dpi: float | None,
+    warnings: list[str] | None = None,
+    **fields,
+) -> Unit:
+    """Run IndicOCR on one PNG. A failure becomes an error unit; it never propagates."""
+    unit = Unit(index=0, kind=kind, origin="ocr", reason=reason, render_dpi=render_dpi, warnings=list(warnings or []), **fields)
+    ctx.used_ocr = True
+    started = time.perf_counter()
+    try:
+        page = ctx.engine.recognize(str(png_path))
+    except Exception as exc:  # per-unit isolation: a bad page must not stop the document or the batch
+        unit.status = "error"
+        unit.error_type = exc.error_type if isinstance(exc, DocpipeError) else type(exc).__name__
+        unit.message = exc.message if isinstance(exc, DocpipeError) else str(exc)
+    else:
+        unit.width_px, unit.height_px = page.width, page.height
+        unit.blocks = page.blocks
+        unit.markdown = page.markdown
+        unit.text = "\n\n".join(b["text"] for b in sorted(page.blocks, key=lambda b: b["order"]) if b.get("text"))
+        unit.warnings += page.warnings
+        if not unit.text.strip():
+            unit.warnings.append("OCR found no text")
+    unit.seconds = round(time.perf_counter() - started, 2)
+    ctx.ocr_seconds += unit.seconds
+    return unit
+
+
+def ocr_embedded_image(ctx: Context, blob: bytes, *, name: str, reason: str) -> Unit | None:
+    """OCR an image embedded in Office/HTML content. Returns None when it was skipped as too small."""
+    try:
+        frame = next(open_image(blob, ctx.opts))
+    except DocpipeError as exc:
+        return error_unit(exc, "image", "ocr", reason, name=name)
+    w, h = frame.image.size
+    if min(w, h) < ctx.opts.min_image_px:
+        ctx.warnings.append(f"skipped {name}: only {w}x{h} px")
+        return None
+    png = save_png(frame.image, ctx.workspace)
+    try:
+        return ocr_unit(ctx, png, kind="image", reason=reason, render_dpi=None, name=name)
+    finally:
+        png.unlink(missing_ok=True)
+
+
+def decode_text(data: bytes) -> tuple[str, list[str]]:
+    """Bytes -> str. BOM, then UTF-8, then Windows-1252 with a warning. Line endings become LF."""
+    warnings: list[str] = []
+    if data.startswith(codecs.BOM_UTF8):
+        text = data[3:].decode("utf-8")
+    elif data.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
+        text = data.decode("utf-16")
+    else:
+        if b"\x00" in data[:8192]:
+            raise CorruptFile("file contains NUL bytes; it is not a text file")
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
+            text = data.decode("cp1252", errors="replace")
+            warnings.append("not valid UTF-8; decoded as Windows-1252, so non-Latin text may be wrong")
+    return text.replace("\r\n", "\n").replace("\r", "\n"), warnings
+
+
+def fence(text: str, lang: str = "") -> str:
+    longest = max((len(m) for m in re.findall(r"`+", text)), default=0)
+    ticks = "`" * max(3, longest + 1)
+    return f"{ticks}{lang}\n{text}\n{ticks}"
+
+
+def md_table(rows: list[list[str]]) -> str:
+    """First row is the header. Cells are escaped so Unicode text and pipes survive."""
+    if not rows:
+        return ""
+    width = max(len(r) for r in rows)
+    if width == 0:
+        return ""
+
+    def cell(value: str) -> str:
+        return value.replace("|", "\\|").replace("\n", "<br>")
+
+    padded = [[cell(c) for c in r] + [""] * (width - len(r)) for r in rows]
+    lines = ["| " + " | ".join(padded[0]) + " |", "| " + " | ".join(["---"] * width) + " |"]
+    lines += ["| " + " | ".join(r) + " |" for r in padded[1:]]
+    return "\n".join(lines)
+
+
+_BASE64_IMAGE = re.compile(r"^(?:iVBORw0KGgo|/9j/|R0lGOD|UklGR|data:image/)[A-Za-z0-9+/=;:,._-]{200,}$")
+
+
+def base64_image_warning(strings, where: str = "") -> str | None:
+    """Base64 images inside JSON/XML are out of scope; say so instead of silently ignoring them."""
+    count = sum(1 for s in strings if isinstance(s, str) and len(s) > 200 and _BASE64_IMAGE.match(s.strip()))
+    if count:
+        return f"{count} base64-encoded image(s) found{where}; embedded images in this format are not OCR'd"
+    return None

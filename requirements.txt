@@ -1,0 +1,23 @@
+# Exact versions this project was built and tested with (Windows 11, Python 3.12, CPU only).
+#
+# Install torch and torchvision TOGETHER from the CPU index first (torchvision pins an exact torch):
+#     pip install torch==2.14.0 torchvision==0.29.0 --index-url https://download.pytorch.org/whl/cpu
+# then everything else:
+#     pip install -r requirements.txt
+# (the two torch pins below are satisfied by the "+cpu" builds from the first command)
+
+torch==2.14.0
+torchvision==0.29.0
+transformers==5.17.0
+accelerate==1.15.0
+huggingface_hub==1.33.0
+numpy==2.5.2
+psutil==7.2.2
+
+PyMuPDF==1.28.2
+python-docx==1.2.0
+openpyxl==3.1.5
+lxml==6.1.3
+Pillow==12.3.0
+
+pytest==9.1.1

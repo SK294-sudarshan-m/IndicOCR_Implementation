@@ -1,0 +1,72 @@
+DOCPIPE PROGRESS  (recover after a context reset: read this file, tests.json, `git log`, then run the fast tests)
+
+== STATE ==
+Phase 0 (explore + measure): IN PROGRESS - measurements below
+Phase 1 (plan):              written below
+Phase 2..6:                  not started
+
+== ENVIRONMENT (measured 2026-09-25) ==
+- Project venv: .venv (Python 3.12.10). torch 2.14.0+cpu + torchvision 0.29.0+cpu installed together from
+  https://download.pytorch.org/whl/cpu, then transformers 5.17.0, accelerate 1.15.0, huggingface_hub 1.33.0,
+  PyMuPDF 1.28.2, python-docx 1.2.0, openpyxl 3.1.5, lxml 6.1.3, pytest 9.1.1, numpy 2.5.2, pillow 12.3.0, psutil 7.2.2.
+- Global Python untouched.
+- Model dir: models/indic-ocr (git-ignored). Code + layout weights copied from the reference clone (no .git).
+  OCR weights downloaded by the user's HF login (I never saw a token):
+    hf download bodhan-ai/indic-ocr weights/ocr/model-00001-of-00001.safetensors
+       --revision cd50d301d0e17e8ecb32fc49c8ccbd7914dcfc25 --local-dir models/indic-ocr
+  SHA-256 40f6a5ce321d65ce18db429c9e8c8b2d2d22d4ec7d71737d150cc0a6edf9ae5f == oid in the clone's LFS pointer. MATCH.
+  Pinned model revision = cd50d301d0e17e8ecb32fc49c8ccbd7914dcfc25 (the clone's HEAD).
+- Reference clone baseline: `git status --porcelain` there ALREADY reported 65 lines before I touched anything
+  (all tracked files staged as deleted "D " + untracked "??" copies; the OCR weight file is an LFS pointer in HEAD but
+  absent on disk). I did not modify it. Acceptance criterion 9 is therefore checked as "status output unchanged vs
+  this baseline", not "clean". Baseline saved outside the project (scratchpad clone_status_baseline.txt); hash recorded
+  by the test in tests/test_clone_untouched.py once written.
+
+== PHASE 0 FINDINGS (known unknowns) ==
+1. Does the recognizer load and run on CPU under transformers>=5.7 in a fresh venv?
+   YES. transformers 5.17.0, torch 2.14.0+cpu. Layout + recognizer both load with device="cpu".
+   Extra stderr noise: "causal_conv1d / flash-linear-attention not installed, falling back to reference PyTorch
+   implementation" (correct but slower; those kernels are not installable on Windows CPU) and tqdm "Loading weights"
+   bars. Both suppressed in model.py (TRANSFORMERS_VERBOSITY=error, HF_HUB_DISABLE_PROGRESS_BARS=1).
+2. Seconds per page and peak RAM, dtype bfloat16 vs float32 (same page, 5 layout blocks / 4 transcribed, 4 threads):
+        dtype      load(layout+rec)   layout   recognizer   page total   peak RSS
+        bfloat16   5.0s + 5.6s        2.9s     27.9s        30.9s        3.49 GB
+        float32    3.5s + 4.8s        3.0s     16.9s        19.9s        5.16 GB
+   Same output lengths in both. DECISION: float32 on CPU (1.65x faster recognizer), bfloat16 on CUDA.
+   Both fit easily in 15.7 GB. Single run each; treat as +/-10%.
+3. Render DPI (clean synthetic page, mixed English/Hindi, 11 pt, fp32):
+        dpi   px          layout+ocr      CER
+        150   1240x1755   25.9s           0.0000
+        200   1653x2339   31.9s           0.0000
+        300   2480x3509   44.5s           0.0000
+   No accuracy difference on clean 11 pt text; time grows with dpi. (7 pt run: see below.)
+4. Are PDF text layers of Indic-script PDFs trustworthy?
+   NOT NECESSARILY. A synthetic Hindi PDF made with MuPDF's HTML story engine and Nirmala UI (shaped correctly on
+   screen) extracts as: NBSP (U+00A0) instead of spaces; "हœ" for "हैं"; "द\nिʟी" for "दिल्ली"; "व\nिशाल" for
+   "विशाल" (spurious line break before a matra, orphan matras at line start, Latin letters inside Devanagari words).
+   A script-block check alone would pass this text. So quality.py also counts orphan combining marks and
+   mixed-script words. Limits: one generator only; I have no real-world legacy-font (Kruti Dev, ASCII-mapped) PDF,
+   so that case is covered by a font-name list only, not measured.
+
+== PHASE 1 PLAN ==
+Modules (build order = smallest first):
+ 1. scaffold: pyproject, requirements (pinned), .gitignore, CLAUDE.md, tests.json, fixture generator, git init
+ 2. schema.py + errors + config.py       (dataclasses, JSON I/O, Options)
+ 3. output.py                            (document.json / document.md, UTF-8, fallbacks)
+ 4. router.py                            (extension + magic bytes)
+ 5. extractors: text, json_, xml_, csv_, xlsx, docx, image
+ 6. render.py + model.py                 (Workspace temp dir, image normalisation, PDF render, lazy IndicOCR wrapper, injectable engine)
+ 7. quality.py + extractors/pdf.py
+ 8. pipeline.py (batch, error isolation) + cli.py (process, doctor)
+ 9. should-have: PPTX (zip+lxml), HTML (lxml.html), Markdown, legacy DOC/XLS/PPT via soffice-or-unsupported
+Checks per acceptance criterion:
+ 1 doctor           -> subprocess test of `docpipe doctor` (fast tier: with a temp empty model dir => non-zero + fixes)
+ 2 native PDF       -> fast test + fresh-subprocess assertion "torch" not in sys.modules
+ 3 image-only PDFs  -> model tier: real weights, CER recorded in tests.json/progress; fast tier: fake engine
+ 4 DOCX             -> fast (fake engine) + model tier
+ 5 XLSX/CSV/JSON/XML-> fast tier, Unicode round-trip
+ 6 broken text layer-> fast tier (routing reason) + model tier (CER)
+ 7 bad inputs       -> fast tier batch test, batch continues
+ 8 console UTF-8    -> subprocess with PYTHONIOENCODING=cp1252 and a Hindi filename
+ 9 temp cleanup / clone untouched -> fast tier
+10 fast passes without weights (run with weights dir renamed); model tier passes with them.
