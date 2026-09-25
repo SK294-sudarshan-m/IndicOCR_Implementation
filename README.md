@@ -92,8 +92,11 @@ Claude Sonnet 5, and writes two files (default `output\judge_output\`):
 - `judge_report.json`: the same data, with `how_to_read` and `overall` at the top. Field names say what they are:
   `llm_quality_rating_out_of_10` (1 = unusable, 10 = perfect; averaged as `average_llm_quality_rating_out_of_10`),
   `llm_verdict` (good / acceptable / poor), `character_accuracy_percent`, `word_accuracy_percent` (and the matching
-  `*_error_rate_percent`), `reading_order_correct`, `missing_text`, `wrong_text`, `hallucinated_text`, `llm_transcription`,
-  and per call `llm_call_latency_seconds`, `llm_input_tokens`, `llm_output_tokens`.
+  `*_error_rate_percent`), `reading_order_correct`, `text_on_page_missing_from_ocr`, `misread_text` (each item has
+  `ocr_text_says` and `page_actually_says`), `text_in_ocr_but_not_on_page`, `llm_judge_comments`, `llm_transcription`,
+  and per call `llm_call_latency_seconds`, `llm_input_tokens`, `llm_output_tokens`. The structure is `judge_model_name`,
+  `max_pages_judged_per_pdf`, `overall_summary`, then `pdfs[]` with `pdf_name`, `source_pdf_path`, `total_ocr_pages_in_pdf`,
+  `judged_pages[]` (each with `page_number`) and, on failure, `error_message`.
 
 Accuracy percentages are measured against the LLM's own transcription, not human ground truth. It needs `pip install anthropic` and
 `ANTHROPIC_API_KEY` in the environment. **Page images leave your machine**: use it only on non-sensitive documents. The judge

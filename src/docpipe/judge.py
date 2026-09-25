@@ -104,10 +104,10 @@ def judge_page(client, model: str, png: bytes, ocr_text: str) -> dict:
         "word_accuracy_percent": _percent(word_error),
         "character_error_rate_percent": round(100 * character_error, 2),
         "word_error_rate_percent": round(100 * word_error, 2),
-        "missing_text": raw.get("missing_text", []),
-        "wrong_text": raw.get("wrong_text", []),
-        "hallucinated_text": raw.get("hallucinated_text", []),
-        "llm_notes": raw.get("notes", ""),
+        "text_on_page_missing_from_ocr": raw.get("missing_text", []),
+        "misread_text": [{"ocr_text_says": w.get("ocr"), "page_actually_says": w.get("actual")} for w in raw.get("wrong_text", []) if isinstance(w, dict)],
+        "text_in_ocr_but_not_on_page": raw.get("hallucinated_text", []),
+        "llm_judge_comments": raw.get("notes", ""),
         "llm_transcription": transcription,
         "llm_call_latency_seconds": latency,
         "llm_input_tokens": tokens_in,
@@ -123,7 +123,7 @@ def _find_pdf(document: DocumentResult, pdfs_dir: Path | None) -> Path | None:
 
 
 HOW_TO_READ = (
-    "Ratings come from an LLM judge (see 'model'): it looks at the page image, transcribes it, and compares the OCR text "
+    "Ratings come from an LLM judge (see 'judge_model_name'): it looks at the page image, transcribes it, and compares the OCR text "
     "with the page. 'llm_quality_rating_out_of_10' is 1 (unusable) to 10 (perfect). Accuracy percentages are "
     "100 minus the error rate measured against the LLM's own transcription, NOT against human-verified ground truth, so "
     "they mean 'agreement with the LLM'. Only the sampled OCR pages were judged."
@@ -138,8 +138,8 @@ def _summarise(pages: list[dict]) -> dict:
         "average_word_accuracy_percent": round(_AVG(j["word_accuracy_percent"] for j in pages), 2),
         "average_character_error_rate_percent": round(_AVG(j["character_error_rate_percent"] for j in pages), 2),
         "average_word_error_rate_percent": round(_AVG(j["word_error_rate_percent"] for j in pages), 2),
-        "verdict_counts": {v: sum(1 for j in pages if j["llm_verdict"] == v) for v in ("good", "acceptable", "poor")},
-        "pages_with_wrong_reading_order": sum(1 for j in pages if j["reading_order_correct"] is False),
+        "number_of_pages_per_llm_verdict": {v: sum(1 for j in pages if j["llm_verdict"] == v) for v in ("good", "acceptable", "poor")},
+        "number_of_pages_with_wrong_reading_order": sum(1 for j in pages if j["reading_order_correct"] is False),
         "total_llm_input_tokens": sum(j["llm_input_tokens"] for j in pages),
         "total_llm_output_tokens": sum(j["llm_output_tokens"] for j in pages),
         "total_llm_call_latency_seconds": round(sum(j["llm_call_latency_seconds"] for j in pages), 2),
@@ -148,30 +148,30 @@ def _summarise(pages: list[dict]) -> dict:
 
 
 def _markdown(report: dict) -> str:
-    o = report["overall"]
-    lines = ["# OCR judge summary", "", f"_{report['how_to_read']}_", "", f"Judge model: `{report['model']}`", ""]
-    if o.get("pages_judged"):
+    o = report["overall_summary"]
+    lines = ["# OCR judge summary", "", f"_{report['how_to_read']}_", "", f"Judge model: `{report['judge_model_name']}`", ""]
+    if o.get("number_of_pages_judged"):
         lines += [
             f"## OVERALL: LLM quality rating **{o['average_llm_quality_rating_out_of_10']} / 10**, character accuracy **{o['average_character_accuracy_percent']}%**, word accuracy **{o['average_word_accuracy_percent']}%**",
             "",
-            f"{o['pdfs_judged']} PDF(s), {o['pages_judged']} page(s) judged; verdicts {o['verdict_counts']}; "
+            f"{o['number_of_pdfs_judged']} PDF(s), {o['number_of_pages_judged']} page(s) judged; verdicts {o['number_of_pages_per_llm_verdict']}; "
             f"{o['total_llm_input_tokens']} input / {o['total_llm_output_tokens']} output tokens; {o['total_llm_call_latency_seconds']} s of LLM time.",
             "",
         ]
     lines += ["## Per PDF", "", "| PDF | Pages judged | LLM quality rating (avg, out of 10) | Character accuracy (avg %) | Word accuracy (avg %) | Verdicts (good / acceptable / poor) |", "|---|---|---|---|---|---|"]
-    for d in report["documents"]:
-        if "error" in d and not d["judged"]:
-            lines.append(f"| {d['document']} | 0 | - | - | - | {d['error']} |")
+    for d in report["pdfs"]:
+        if "error_message" in d and not d["judged_pages"]:
+            lines.append(f"| {d['pdf_name']} | 0 | - | - | - | {d['error_message']} |")
             continue
-        v = d.get("verdict_counts", {})
-        lines.append(f"| {d['document']} | {len([j for j in d['judged'] if 'error' not in j])} | {d.get('average_llm_quality_rating_out_of_10', '-')} | {d.get('average_character_accuracy_percent', '-')} | {d.get('average_word_accuracy_percent', '-')} | {v.get('good', 0)} / {v.get('acceptable', 0)} / {v.get('poor', 0)} |")
+        v = d.get("number_of_pages_per_llm_verdict", {})
+        lines.append(f"| {d['pdf_name']} | {len([j for j in d['judged_pages'] if 'error_message' not in j])} | {d.get('average_llm_quality_rating_out_of_10', '-')} | {d.get('average_character_accuracy_percent', '-')} | {d.get('average_word_accuracy_percent', '-')} | {v.get('good', 0)} / {v.get('acceptable', 0)} / {v.get('poor', 0)} |")
     lines += ["", "## Per page", "", "| PDF | Page | LLM quality rating (out of 10) | LLM verdict | Character accuracy % | Word accuracy % | Reading order correct | Missing / wrong / invented items | LLM call (s) | Tokens in / out |", "|---|---|---|---|---|---|---|---|---|---|"]
-    for d in report["documents"]:
-        for j in d["judged"]:
-            if "error" in j:
-                lines.append(f"| {d['document']} | {j['page']} | - | - | - | - | - | ERROR: {j['error']} | - | - |")
+    for d in report["pdfs"]:
+        for j in d["judged_pages"]:
+            if "error_message" in j:
+                lines.append(f"| {d['pdf_name']} | {j['page_number']} | - | - | - | - | - | ERROR: {j['error_message']} | - | - |")
             else:
-                lines.append(f"| {d['document']} | {j['page']} | {j['llm_quality_rating_out_of_10']} | {j['llm_verdict']} | {j['character_accuracy_percent']} | {j['word_accuracy_percent']} | {j['reading_order_correct']} | {len(j['missing_text'])} / {len(j['wrong_text'])} / {len(j['hallucinated_text'])} | {j['llm_call_latency_seconds']} | {j['llm_input_tokens']} / {j['llm_output_tokens']} |")
+                lines.append(f"| {d['pdf_name']} | {j['page_number']} | {j['llm_quality_rating_out_of_10']} | {j['llm_verdict']} | {j['character_accuracy_percent']} | {j['word_accuracy_percent']} | {j['reading_order_correct']} | {len(j['text_on_page_missing_from_ocr'])} / {len(j['misread_text'])} / {len(j['text_in_ocr_but_not_on_page'])} | {j['llm_call_latency_seconds']} | {j['llm_input_tokens']} / {j['llm_output_tokens']} |")
     return "\n".join(lines) + "\n"
 
 
@@ -195,44 +195,44 @@ def run(output_dir: Path, pdfs_dir: Path | None = None, pages_per_pdf: int = 3, 
         plan.append((path, document, [ocr_units[i] for i in sample_indices(len(ocr_units), pages_per_pdf)], len(ocr_units)))
     say(f"judge: {model}; {sum(len(c) for _, _, c, _ in plan)} page(s) from {len(plan)} PDF(s) will be sent to the Anthropic API")
 
-    report = {"how_to_read": HOW_TO_READ, "model": model, "pages_per_pdf": pages_per_pdf, "overall": {}, "documents": []}
+    report = {"how_to_read": HOW_TO_READ, "judge_model_name": model, "max_pages_judged_per_pdf": pages_per_pdf, "overall_summary": {}, "pdfs": []}
     for path, document, chosen, n_ocr in plan:
-        entry = {"document": path.parent.name, "source": document.source, "ocr_pages_in_document": n_ocr, "judged": []}
+        entry = {"pdf_name": path.parent.name, "source_pdf_path": document.source, "total_ocr_pages_in_pdf": n_ocr, "judged_pages": []}
         pdf = _find_pdf(document, pdfs_dir)
         if pdf is None:
-            entry["error"] = "source PDF not found; pass --pdfs"
+            entry["error_message"] = "source PDF not found; pass --pdfs"
         elif not chosen:
-            entry["error"] = "no OCR pages in this document (text layer was used); nothing to judge"
+            entry["error_message"] = "no OCR pages in this document (text layer was used); nothing to judge"
         else:
             for unit in chosen:
-                item = {"page": unit.page}
-                say(f"  {entry['document']} p{unit.page}: calling {model} ...")
+                item = {"page_number": unit.page}
+                say(f"  {entry['pdf_name']} p{unit.page}: calling {model} ...")
                 try:
                     item.update(judge_page(client, model, _render(pdf, unit.page), unit.text))
                 except Exception as exc:  # one failed page must not stop the run
-                    item["error"] = f"{type(exc).__name__}: {str(exc)[:200]}"
-                entry["judged"].append(item)
-                say(f"  {entry['document']} p{unit.page}: " + (item.get("error") or (
+                    item["error_message"] = f"{type(exc).__name__}: {str(exc)[:200]}"
+                entry["judged_pages"].append(item)
+                say(f"  {entry['pdf_name']} p{unit.page}: " + (item.get("error_message") or (
                     f"LLM quality rating {item['llm_quality_rating_out_of_10']}/10 ({item['llm_verdict']}) | character accuracy {item['character_accuracy_percent']}% | "
                     f"word accuracy {item['word_accuracy_percent']}% | LLM call {item['llm_call_latency_seconds']}s, {item['llm_input_tokens']} in / {item['llm_output_tokens']} out tokens")))
-        ok = [j for j in entry["judged"] if "error" not in j]
+        ok = [j for j in entry["judged_pages"] if "error_message" not in j]
         if ok:
             entry.update(_summarise(ok))
-        report["documents"].append(entry)
+        report["pdfs"].append(entry)
 
-    all_pages = [j for d in report["documents"] for j in d["judged"] if "error" not in j]
-    report["overall"] = {
-        "pdfs_judged": sum(1 for d in report["documents"] if "average_llm_quality_rating_out_of_10" in d),
-        "pages_judged": len(all_pages),
+    all_pages = [j for d in report["pdfs"] for j in d["judged_pages"] if "error_message" not in j]
+    report["overall_summary"] = {
+        "number_of_pdfs_judged": sum(1 for d in report["pdfs"] if "average_llm_quality_rating_out_of_10" in d),
+        "number_of_pages_judged": len(all_pages),
         **(_summarise(all_pages) if all_pages else {}),
     }
     report_dir = report_dir or output_dir
     report_dir.mkdir(parents=True, exist_ok=True)
     (report_dir / "judge_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     (report_dir / "judge_summary.md").write_text(_markdown(report), encoding="utf-8")
-    o = report["overall"]
+    o = report["overall_summary"]
     if all_pages:
-        say(f"OVERALL: LLM quality rating {o['average_llm_quality_rating_out_of_10']}/10 | character accuracy {o['average_character_accuracy_percent']}% | word accuracy {o['average_word_accuracy_percent']}% | verdicts {o['verdict_counts']}")
-        say(f"         {o['total_llm_input_tokens']} in / {o['total_llm_output_tokens']} out tokens, {o['total_llm_call_latency_seconds']}s LLM time ({o['pdfs_judged']} PDFs, {o['pages_judged']} pages)")
+        say(f"OVERALL: LLM quality rating {o['average_llm_quality_rating_out_of_10']}/10 | character accuracy {o['average_character_accuracy_percent']}% | word accuracy {o['average_word_accuracy_percent']}% | verdicts {o['number_of_pages_per_llm_verdict']}")
+        say(f"         {o['total_llm_input_tokens']} in / {o['total_llm_output_tokens']} out tokens, {o['total_llm_call_latency_seconds']}s LLM time ({o['number_of_pdfs_judged']} PDFs, {o['number_of_pages_judged']} pages)")
     say(f"reports: {report_dir / 'judge_summary.md'}  and  {report_dir / 'judge_report.json'}")
     return report
