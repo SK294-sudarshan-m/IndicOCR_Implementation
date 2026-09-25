@@ -167,7 +167,9 @@ class IndicOcrEngine:
         self._load_error: ModelUnavailable | None = None
         self._device = self._dtype = None
         self._truncated = 0
+        self._max_tokens = 0
         self.load_seconds = 0.0
+        self.status = lambda message: None  # the CLI points this at stderr so a 10+ s load is not silent
 
     @property
     def injected(self) -> bool:
@@ -179,6 +181,7 @@ class IndicOcrEngine:
         if self._load_error is not None:
             raise self._load_error
         started = time.perf_counter()
+        self.status("loading IndicOCR (first OCR page in this run)")
         try:
             self._load_unchecked()
         except ModelUnavailable as exc:

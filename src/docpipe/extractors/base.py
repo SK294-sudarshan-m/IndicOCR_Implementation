@@ -86,6 +86,34 @@ def ocr_embedded_image(ctx: Context, blob: bytes, *, name: str, reason: str) -> 
         png.unlink(missing_ok=True)
 
 
+def local_image_bytes(ctx: Context, base_dir: Path, src: str) -> bytes | None:
+    """Bytes of an image referenced from HTML/Markdown: a data: URI or a file under ``base_dir``. Remote
+    references are never fetched (processing makes no network calls)."""
+    import base64
+    from urllib.parse import unquote, urlparse
+
+    src = src.strip()
+    if src.startswith("data:"):
+        header, _, payload = src.partition(",")
+        try:
+            return base64.b64decode(payload) if ";base64" in header else unquote(payload).encode("latin-1")
+        except ValueError:
+            ctx.warnings.append("an inline data: image could not be decoded")
+            return None
+    parsed = urlparse(src)
+    if parsed.scheme or src.startswith("//"):
+        ctx.warnings.append(f"remote image not fetched (no network calls are made): {src[:80]}")
+        return None
+    target = (base_dir / unquote(parsed.path)).resolve()
+    if base_dir.resolve() not in target.parents:
+        ctx.warnings.append(f"image outside the document's folder was not read: {src[:80]}")
+        return None
+    if not target.is_file():
+        ctx.warnings.append(f"image file not found: {src[:80]}")
+        return None
+    return target.read_bytes()
+
+
 def decode_text(data: bytes) -> tuple[str, list[str]]:
     """Bytes -> str. BOM, then UTF-8, then Windows-1252 with a warning. Line endings become LF."""
     warnings: list[str] = []

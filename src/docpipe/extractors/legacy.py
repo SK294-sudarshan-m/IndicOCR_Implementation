@@ -21,7 +21,7 @@ def extract(path: Path, ctx: Context) -> list[Unit]:
     if soffice is None:
         raise UnsupportedFormat(
             f"unsupported: {suffix} is a legacy binary format and needs LibreOffice (soffice was not found on PATH); "
-            f"convert the file to {TARGET[suffix]} or install LibreOffice"
+            f"convert the file to .{TARGET[suffix]} or install LibreOffice"
         )
     out = ctx.workspace.path / "converted"
     out.mkdir(exist_ok=True)

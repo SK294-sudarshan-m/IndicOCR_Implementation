@@ -34,6 +34,16 @@ def _pages(value: str) -> str:
     return value
 
 
+def _dpi(value: str) -> int:
+    try:
+        dpi = int(value)
+    except ValueError:
+        dpi = 0
+    if not 50 <= dpi <= 600:
+        raise argparse.ArgumentTypeError(f"--dpi must be a whole number from 50 to 600, got {value!r}")
+    return dpi
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="docpipe", description="Documents in, JSON and Markdown out. IndicOCR reads only the pixels.")
     parser.add_argument("--version", action=_Version, help="print version and the IndicOCR attribution")
@@ -46,7 +56,7 @@ def build_parser() -> argparse.ArgumentParser:
     proc = sub.add_parser("process", help="convert documents to document.json + document.md")
     proc.add_argument("inputs", nargs="+", type=Path, metavar="path", help="files or folders")
     proc.add_argument("--out", required=True, type=Path, help="output folder; one subfolder per input document")
-    proc.add_argument("--dpi", type=int, default=200, help="render resolution for PDF pages sent to OCR (default 200)")
+    proc.add_argument("--dpi", type=_dpi, default=200, help="render resolution for PDF pages sent to OCR, 50-600 (default 200)")
     proc.add_argument("--force-ocr", action="store_true", help="OCR every PDF page, ignoring text layers")
     proc.add_argument("--pages", type=_pages, help="PDF pages / TIFF frames to process, e.g. 1-5,8")
     proc.add_argument("--table-format", choices=["html", "markdown"], default="html")
@@ -73,7 +83,8 @@ def _summary(result) -> str:
     if result.status == "error":
         return f"{result.error_type}: {result.message}"
     ocr = sum(1 for u in result.units if u.origin == "ocr")
-    return f"{len(result.units)} units ({len(result.units) - ocr} native, {ocr} ocr), {result.timings.get('total_seconds', 0)}s"
+    n = len(result.units)
+    return f"{n} unit{'s' if n != 1 else ''} ({n - ocr} native, {ocr} ocr), {result.timings.get('total_seconds', 0)}s"
 
 
 def main(argv: list[str] | None = None) -> int:

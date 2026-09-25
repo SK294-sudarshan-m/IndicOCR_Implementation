@@ -90,7 +90,7 @@ def open_image(source, opts: Options, pages: str | None = None) -> Iterator[Imag
             raise CorruptFile(f"image could not be opened: {exc}") from None
 
         total = getattr(im, "n_frames", 1)
-        for page_number in select_pages(pages, total):
+        for page_number in select_pages(pages if total > 1 else None, total):  # --pages is about paged documents
             index = page_number - 1
             try:
                 im.seek(index)

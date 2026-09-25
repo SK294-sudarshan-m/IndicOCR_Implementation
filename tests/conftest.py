@@ -15,6 +15,23 @@ from docpipe.config import Options  # noqa: E402
 from docpipe.pipeline import process_document  # noqa: E402
 
 
+def pytest_configure(config):
+    config._docpipe_rows = []
+
+
+@pytest.fixture(scope="session")
+def measurements(request) -> list[str]:
+    """Model-tier CER/timing lines, printed at the end of the run."""
+    return request.config._docpipe_rows
+
+
+def pytest_terminal_summary(terminalreporter, config):
+    if config._docpipe_rows:
+        terminalreporter.section("model tier measurements")
+        for row in config._docpipe_rows:
+            terminalreporter.write_line(row)
+
+
 @pytest.fixture(scope="session")
 def fx(tmp_path_factory) -> Path:
     """Directory with every generated fixture."""

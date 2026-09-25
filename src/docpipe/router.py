@@ -109,7 +109,7 @@ def detect_format(path: Path) -> tuple[str, list[str]]:
         raise UnsupportedFormat("legacy Office/OLE container with an unrecognised extension")
 
     if magic is not None:  # binary content identified: it wins over the extension
-        if by_ext is not None and by_ext != magic and not (by_ext in _TEXT_FORMATS):
+        if by_ext is not None and by_ext != magic:
             warnings.append(f"extension {path.suffix} says {by_ext} but the content is {magic}; treated as {magic}")
         return magic, warnings
 

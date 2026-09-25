@@ -129,6 +129,45 @@ def _patch_cached_values(path: Path, cached: dict[str, str]) -> None:
             z.writestr(name, data)
 
 
+def _write_pptx(path: Path, picture_png: bytes) -> None:
+    """A minimal two-slide deck written by hand (python-pptx is not a dependency)."""
+    ns = (
+        'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" '
+        'xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"'
+    )
+    rels_ns = "http://schemas.openxmlformats.org/package/2006/relationships"
+
+    def shape(text, ph=""):
+        return f'<p:sp><p:nvSpPr><p:cNvPr id="2" name="s"/><p:cNvSpPr/><p:nvPr>{ph}</p:nvPr></p:nvSpPr><p:txBody><a:p><a:r><a:t>{text}</a:t></a:r></a:p></p:txBody></p:sp>'
+
+    def cell(t):
+        return f"<a:tc><a:txBody><a:p><a:r><a:t>{t}</a:t></a:r></a:p></a:txBody></a:tc>"
+
+    table = (
+        "<p:graphicFrame><a:graphic><a:graphicData><a:tbl>"
+        f"<a:tr>{cell('Item')}{cell('मद')}</a:tr><a:tr>{cell('Rice')}{cell('चावल')}</a:tr>"
+        "</a:tbl></a:graphicData></a:graphic></p:graphicFrame>"
+    )
+    picture = '<p:pic><p:blipFill><a:blip r:embed="rId2"/></p:blipFill></p:pic>'
+    title_placeholder = '<p:ph type="title"/>'
+    slide1 = f"<p:sld {ns}><p:cSld><p:spTree>{shape(EN_TITLE, title_placeholder)}{shape(HI_P2)}{table}{picture}</p:spTree></p:cSld></p:sld>"
+    slide2 = f"<p:sld {ns}><p:cSld><p:spTree>{shape('End of deck')}</p:spTree></p:cSld></p:sld>"
+    parts = {
+        "[Content_Types].xml": '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/></Types>',
+        "_rels/.rels": f'<Relationships xmlns="{rels_ns}"><Relationship Id="rId1" Type="x" Target="ppt/presentation.xml"/></Relationships>',
+        "ppt/presentation.xml": f'<p:presentation {ns}><p:sldIdLst><p:sldId id="256" r:id="rId1"/><p:sldId id="257" r:id="rId2"/></p:sldIdLst></p:presentation>',
+        "ppt/_rels/presentation.xml.rels": f'<Relationships xmlns="{rels_ns}"><Relationship Id="rId1" Type="x" Target="slides/slide1.xml"/><Relationship Id="rId2" Type="x" Target="slides/slide2.xml"/></Relationships>',
+        "ppt/slides/slide1.xml": slide1,
+        "ppt/slides/_rels/slide1.xml.rels": f'<Relationships xmlns="{rels_ns}"><Relationship Id="rId2" Type="x" Target="../media/image1.png"/></Relationships>',
+        "ppt/slides/slide2.xml": slide2,
+        "ppt/media/image1.png": picture_png,
+    }
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        for name, data in parts.items():
+            z.writestr(name, data)
+
+
 def build(out: Path) -> dict:
     """Create all fixtures in ``out``. Returns the ground truth (also written to truth.json)."""
     out.mkdir(parents=True, exist_ok=True)
@@ -233,6 +272,23 @@ def build(out: Path) -> dict:
     wb2.active["A1"] = "Picture below"
     wb2.active.add_image(XlImage(io.BytesIO(sentence_png)), "A3")
     wb2.save(out / "book_image.xlsx")
+
+    (out / "assets").mkdir(exist_ok=True)
+    (out / "assets" / "sentence.png").write_bytes(sentence_png)
+    _write_pptx(out / "deck.pptx", sentence_png)
+    import base64
+
+    data_uri = "data:image/png;base64," + base64.b64encode(sentence_png).decode("ascii")
+    (out / "page.html").write_text(
+        '<!doctype html><html><head><meta charset="utf-8"><title>Quarterly Report</title><script>var hidden = 1;</script></head><body>'
+        f"<h1>Quarterly Report</h1><p>{EN_P2} <b>Bold</b> text.</p><p>{HI_P2}</p>"
+        "<ul><li>one</li><li>दो</li></ul>"
+        "<table><tr><th>Item</th><th>मद</th></tr><tr><td>Rice</td><td>चावल</td></tr></table>"
+        '<img src="assets/sentence.png"><p>after the image</p>'
+        f'<img src="https://example.com/remote.png"><img src="{data_uri}"></body></html>',
+        encoding="utf-8",
+    )
+    (out / "notes.md").write_text("# Notes\n\nSome text with `code`.\n\n![scan](assets/sentence.png)\n\nMore text.\n", encoding="utf-8")
 
     (out / "table.csv").write_bytes(
         ("नाम,शहर,टिप्पणी\r\nराम,दिल्ली,\"पहली, दूसरी\"\r\nJohn,Mumbai,\"two\nlines\"\r\nx|y,\"a \"\"quoted\"\" word\",ok\r\n").encode("utf-8-sig")

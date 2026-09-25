@@ -97,6 +97,17 @@ def test_bad_pages_argument_is_rejected(fx, tmp_path):
     assert proc.returncode == 2 and "invalid range" in text(proc.stderr)
 
 
+def test_bad_dpi_is_rejected(fx, tmp_path):
+    proc = run("process", str(fx / "nested.json"), "--out", str(tmp_path), "--dpi", "5")
+    assert proc.returncode == 2 and "--dpi must be a whole number from 50 to 600" in text(proc.stderr)
+
+
+def test_pages_is_ignored_with_a_warning_for_unpaged_formats(process):
+    doc = process("nested.json", pages="2")
+    assert doc.status == "ok" and any("--pages applies to PDF pages" in w for w in doc.warnings)
+    assert process("hi_page.png", pages="3").units, "a single-frame image is not dropped by --pages"
+
+
 def test_process_cli_options_reach_the_pipeline(fx, tmp_path):
     proc = run("process", str(fx / "en_born_digital.pdf"), "--out", str(tmp_path), "--pages", "2")
     assert proc.returncode == 0

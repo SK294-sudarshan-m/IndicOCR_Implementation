@@ -18,6 +18,7 @@ from .render import Workspace
 from .router import EXTENSIONS, detect_format, get_extractor
 from .schema import DocumentResult
 
+_PAGED = {"pdf", "tiff", "png", "jpeg", "bmp", "webp"}  # single-frame images ignore --pages inside open_image
 _FORMAT_LIBS = {
     "pdf": ["PyMuPDF"],
     "docx": ["python-docx", "lxml"],
@@ -92,6 +93,8 @@ def process_document(
         result.sha256 = sha256_file(path)
         result.format, warnings = detect_format(path)
         result.warnings.extend(warnings)
+        if opts.pages and result.format not in _PAGED:
+            result.warnings.append(f"--pages applies to PDF pages and multi-frame TIFF frames only; ignored for {result.format}")
         with Workspace() as workspace:
             ctx = Context(opts, workspace, engine, emit=emit)
             units = get_extractor(result.format)(path, ctx)
@@ -167,6 +170,8 @@ def process_batch(
     jobs, skipped = collect_inputs(inputs, out_dir)
     own_engine = engine is None
     engine = engine or IndicOcrEngine(opts)
+    if hasattr(engine, "status"):
+        engine.status = lambda message: emit(f"  {message}")
     batch = BatchResult(skipped=skipped)
     taken: set[str] = set()
     try:
