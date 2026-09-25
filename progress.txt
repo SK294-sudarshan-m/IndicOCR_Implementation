@@ -1,72 +1,63 @@
-DOCPIPE PROGRESS  (recover after a context reset: read this file, tests.json, `git log`, then run the fast tests)
+DOCPIPE PROGRESS  (after a context reset: read this file, tests.json, `git log`, then run `.venv\Scripts\python -m pytest`)
 
-== STATE ==
-Phase 0 (explore + measure): IN PROGRESS - measurements below
-Phase 1 (plan):              written below
-Phase 2..6:                  not started
+== STATE (2026-09-25) ==
+Phases 0-4 done. Phase 5 (subagent review) was NOT run: the user stopped it to save usage. Phase 6 report not written.
+Fast tier: 102 passed (last run after the CSV/HTML/JSON/TXT/XML removal). Model tier: 10 passed, run before the later edits, not re-run.
 
-== ENVIRONMENT (measured 2026-09-25) ==
-- Project venv: .venv (Python 3.12.10). torch 2.14.0+cpu + torchvision 0.29.0+cpu installed together from
-  https://download.pytorch.org/whl/cpu, then transformers 5.17.0, accelerate 1.15.0, huggingface_hub 1.33.0,
-  PyMuPDF 1.28.2, python-docx 1.2.0, openpyxl 3.1.5, lxml 6.1.3, pytest 9.1.1, numpy 2.5.2, pillow 12.3.0, psutil 7.2.2.
-- Global Python untouched.
-- Model dir: models/indic-ocr (git-ignored). Code + layout weights copied from the reference clone (no .git).
-  OCR weights downloaded by the user's HF login (I never saw a token):
-    hf download bodhan-ai/indic-ocr weights/ocr/model-00001-of-00001.safetensors
-       --revision cd50d301d0e17e8ecb32fc49c8ccbd7914dcfc25 --local-dir models/indic-ocr
-  SHA-256 40f6a5ce321d65ce18db429c9e8c8b2d2d22d4ec7d71737d150cc0a6edf9ae5f == oid in the clone's LFS pointer. MATCH.
-  Pinned model revision = cd50d301d0e17e8ecb32fc49c8ccbd7914dcfc25 (the clone's HEAD).
-- Reference clone baseline: `git status --porcelain` there ALREADY reported 65 lines before I touched anything
-  (all tracked files staged as deleted "D " + untracked "??" copies; the OCR weight file is an LFS pointer in HEAD but
-  absent on disk). I did not modify it. Acceptance criterion 9 is therefore checked as "status output unchanged vs
-  this baseline", not "clean". Baseline saved outside the project (scratchpad clone_status_baseline.txt); hash recorded
-  by the test in tests/test_clone_untouched.py once written.
+== SCOPE (user decisions) ==
+- Formats now supported: PDF, DOCX, XLSX, PPTX, standalone images (PNG/JPEG/TIFF/BMP/WEBP), Markdown, legacy DOC/XLS/PPT
+  (LibreOffice if on PATH, else "unsupported"). OCR only for pixels: image-only PDF pages, standalone images, images embedded in
+  DOCX/XLSX/PPTX/Markdown.
+- REMOVED at the user's request: CSV, HTML, JSON, TXT, XML (code, tests, fixtures). They now return UnsupportedFormat.
+  An earlier removal of images/Markdown/legacy was a misreading and was reverted (commit f9a6fb6).
+- User rules: bare-minimum tests (one 1-page PDF), no subagents or extras without asking, results go to
+  C:\Users\User\Desktop\IndicOCR_Results (never the scratchpad). Tasks under ~10,000 credits need no permission.
+- Added on request: src/docpipe/metrics.py (CER, WER, token F1, field accuracy, exact match, IoU, reading-order distance,
+  STP/HITL rate, throughput) and `docpipe evaluate document.json --reference ref.txt`. Only CER, WER, token F1, throughput and
+  the review flag have been run (on the one scanned PDF). The rest are untested.
+
+== ENVIRONMENT ==
+- .venv (Python 3.12.10): torch 2.14.0+cpu, torchvision 0.29.0+cpu (same index, one command), transformers 5.17.0,
+  accelerate 1.15.0, huggingface_hub 1.33.0, PyMuPDF 1.28.2, python-docx 1.2.0, openpyxl 3.1.5, lxml 6.1.3, pillow 12.3.0,
+  numpy 2.5.2, psutil 7.2.2, pytest 9.1.1, plus `anthropic` (validation script only). Global Python untouched.
+- Model dir models/indic-ocr (git-ignored): code + layout weights copied from the reference clone; OCR weights downloaded with the
+  user's own `hf auth login` (never saw a token): hf download bodhan-ai/indic-ocr weights/ocr/model-00001-of-00001.safetensors
+  --revision cd50d301d0e17e8ecb32fc49c8ccbd7914dcfc25. SHA-256 40f6a5ce...ae5f matches the LFS pointer.
+- Reference clone: `git status --porcelain` already showed 65 lines BEFORE any work (all files staged deleted + untracked; OCR
+  weight only an LFS pointer). Unchanged since (tests/test_clone_untouched.py pins HEAD and the status hash).
+- ANTHROPIC_API_KEY is stored at Windows user level; the app process did not inherit it, so it was passed to a child process only.
 
 == PHASE 0 FINDINGS (known unknowns) ==
-1. Does the recognizer load and run on CPU under transformers>=5.7 in a fresh venv?
-   YES. transformers 5.17.0, torch 2.14.0+cpu. Layout + recognizer both load with device="cpu".
-   Extra stderr noise: "causal_conv1d / flash-linear-attention not installed, falling back to reference PyTorch
-   implementation" (correct but slower; those kernels are not installable on Windows CPU) and tqdm "Loading weights"
-   bars. Both suppressed in model.py (TRANSFORMERS_VERBOSITY=error, HF_HUB_DISABLE_PROGRESS_BARS=1).
-2. Seconds per page and peak RAM, dtype bfloat16 vs float32 (same page, 5 layout blocks / 4 transcribed, 4 threads):
-        dtype      load(layout+rec)   layout   recognizer   page total   peak RSS
-        bfloat16   5.0s + 5.6s        2.9s     27.9s        30.9s        3.49 GB
-        float32    3.5s + 4.8s        3.0s     16.9s        19.9s        5.16 GB
-   Same output lengths in both. DECISION: float32 on CPU (1.65x faster recognizer), bfloat16 on CUDA.
-   Both fit easily in 15.7 GB. Single run each; treat as +/-10%.
-3. Render DPI (clean synthetic page, mixed English/Hindi, 11 pt, fp32):
-        dpi   px          layout+ocr      CER
-        150   1240x1755   25.9s           0.0000
-        200   1653x2339   31.9s           0.0000
-        300   2480x3509   44.5s           0.0000
-   No accuracy difference on clean 11 pt text; time grows with dpi. (7 pt run: see below.)
-4. Are PDF text layers of Indic-script PDFs trustworthy?
-   NOT NECESSARILY. A synthetic Hindi PDF made with MuPDF's HTML story engine and Nirmala UI (shaped correctly on
-   screen) extracts as: NBSP (U+00A0) instead of spaces; "हœ" for "हैं"; "द\nिʟी" for "दिल्ली"; "व\nिशाल" for
-   "विशाल" (spurious line break before a matra, orphan matras at line start, Latin letters inside Devanagari words).
-   A script-block check alone would pass this text. So quality.py also counts orphan combining marks and
-   mixed-script words. Limits: one generator only; I have no real-world legacy-font (Kruti Dev, ASCII-mapped) PDF,
-   so that case is covered by a font-name list only, not measured.
+1. Recognizer loads and runs on CPU under transformers 5.17.0 / torch 2.14.0+cpu. Noisy stderr (causal_conv1d fallback,
+   tqdm bars) is suppressed in model.py.
+2. dtype (same page, 4 transcribed blocks): bfloat16 recognizer 27.9 s, 3.49 GB peak; float32 16.9 s, 5.16 GB. DECISION: float32 on CPU,
+   bfloat16 on CUDA. CUDA path is untested (no GPU).
+3. DPI: CER 0.0000 at 100/150/200/300 dpi on clean 11 pt, clean 7 pt and a degraded 300-dpi scan (blur, noise, skew, JPEG q45).
+   Time 26.7/26.3/31.0/43.9 s per page. Kept 200 dpi. The fixtures saturate, so this cannot show where real bad scans need more.
+4. PDF text layers of Indic text are NOT always trustworthy: a MuPDF-generated Hindi PDF (Nirmala UI, shaped correctly) extracts with
+   U+FFFD, detached matras ("व\nिशाल") and NBSP. quality.py catches this (replacement chars + orphan combining marks + stray
+   Latin letters in Indic words), plus PUA, foreign-script ratio, word length, legacy font names. ASCII-mapped legacy fonts
+   (Kruti Dev) are caught by font name only; never tested on a real file.
 
-== PHASE 1 PLAN ==
-Modules (build order = smallest first):
- 1. scaffold: pyproject, requirements (pinned), .gitignore, CLAUDE.md, tests.json, fixture generator, git init
- 2. schema.py + errors + config.py       (dataclasses, JSON I/O, Options)
- 3. output.py                            (document.json / document.md, UTF-8, fallbacks)
- 4. router.py                            (extension + magic bytes)
- 5. extractors: text, json_, xml_, csv_, xlsx, docx, image
- 6. render.py + model.py                 (Workspace temp dir, image normalisation, PDF render, lazy IndicOCR wrapper, injectable engine)
- 7. quality.py + extractors/pdf.py
- 8. pipeline.py (batch, error isolation) + cli.py (process, doctor)
- 9. should-have: PPTX (zip+lxml), HTML (lxml.html), Markdown, legacy DOC/XLS/PPT via soffice-or-unsupported
-Checks per acceptance criterion:
- 1 doctor           -> subprocess test of `docpipe doctor` (fast tier: with a temp empty model dir => non-zero + fixes)
- 2 native PDF       -> fast test + fresh-subprocess assertion "torch" not in sys.modules
- 3 image-only PDFs  -> model tier: real weights, CER recorded in tests.json/progress; fast tier: fake engine
- 4 DOCX             -> fast (fake engine) + model tier
- 5 XLSX/CSV/JSON/XML-> fast tier, Unicode round-trip
- 6 broken text layer-> fast tier (routing reason) + model tier (CER)
- 7 bad inputs       -> fast tier batch test, batch continues
- 8 console UTF-8    -> subprocess with PYTHONIOENCODING=cp1252 and a Hindi filename
- 9 temp cleanup / clone untouched -> fast tier
-10 fast passes without weights (run with weights dir renamed); model tier passes with them.
+== MEASUREMENTS ==
+- Model tier (real weights, generated fixtures): 10 passed in 148 s; CER 0.0000 on every fixture (image-only EN/HI PDFs, PUA /
+  legacy / MuPDF-damaged text layers routed to OCR, degraded scan, EXIF photo, DOCX image); no socket opened during load + OCR.
+  Limits in tests/test_model.py: 0.05 (0.08 degraded), i.e. baseline 0 plus margin. Metric sanity-checked in tests/test_cer.py.
+- End-to-end CLI over 38 fixtures with the real model: 3 min 53 s wall; 28 ok, 10 error (all intended bad inputs), batch continued.
+  20 OCR units: median 9.8 s, mean 11.4 s, min 5.4 s, max 23.1 s (layout + recognizer). Model load 17.5 s cold (4.6 s warm).
+  Peak RSS 5.48 GB. Native PDF pages: 0.03-0.05 s per document.
+- Real scanned page (W3C-era public sample, solutions.weblite.ca/pdfocrx/scansmpl.pdf, 1 page, 21 KB, no text layer):
+  docpipe routed it to OCR (83.6 s, cold model). Against a Claude Sonnet 5 transcription (one API call):
+  CER 0.0060, WER 0.0105, token P/R/F1 0.995/0.990/0.992. Missed the handwritten "Phil." signature; one block below confidence 0.8
+  (flagged for review). Reference is an LLM, not human ground truth; one English page only, no real Hindi scan tested.
+  Results: C:\Users\User\Desktop\IndicOCR_Results (scan.pdf, document.json/md, claude_reference.txt, evaluation.json).
+
+== KNOWN GAPS / NOT VERIFIED ==
+- No real-world Hindi/Indic scan or legacy-font PDF was tested; accuracy numbers on Indic scripts come from generated pages only.
+- Real Windows console output (as opposed to a cp1252 pipe) was not tested.
+- Model tier and the weights-hidden fast tier were not re-run after the last edits.
+- Field accuracy, exact match, IoU, reading-order distance and STP/HITL functions are untested.
+- Removed formats leave some generic helpers in place (Pillow-based image handling is still used by embedded images).
+
+== NEXT (only if the user asks) ==
+Re-run `pytest -m model`; test a real Hindi scan; refresh README; the Phase 5 review; final report.
