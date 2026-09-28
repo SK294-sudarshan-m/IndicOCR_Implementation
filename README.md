@@ -38,9 +38,6 @@ python -m venv .venv
 .\.venv\Scripts\python -m pip install -e . --no-deps --no-build-isolation
 ```
 
-Without the OCR stack (`torch`, `torchvision`, `transformers`, `accelerate`) this tool still processes every native
-format; only OCR is unavailable. `pip install -e .` alone installs just the native-format dependencies.
-
 ### One-time model download
 
 The model is gated on Hugging Face. Accept its license with your account at the model's Hugging Face page, then in
