@@ -222,3 +222,5 @@ internal use is free; hosting it for third parties needs Bodhan AI's prior writt
 section 10 apply to everyone. Personal data in your documents remains your responsibility under India's DPDP Act.
 
 **Built with IndicOCR from Bodhan AI / AI4Bharat.** (Also printed by `docpipe --version` and stored in every `document.json`.)
+#   I n d i c O C R _ I m p l e m e n t a t i o n  
+ 
