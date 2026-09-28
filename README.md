@@ -1,17 +1,32 @@
 # docpipe
 
 Local command-line tool and Python library that turns documents into structured text: for every input it writes one
-`document.json` (the units carry their text and a Markdown-formatted `markdown` string; no .md files are written).
+`document.json` (the units carry their text and a Markdown-formatted `markdown` string; no `.md` files are written).
 
 Anything that already contains machine-readable text is **parsed natively**. Anything that exists only as pixels
 (scans, photos, image-only PDF pages, pictures embedded in Office files) goes through
-[IndicOCR](https://huggingface.co/bodhan-ai/indic-ocr), which reads English and 22 Indian languages. IndicOCR only reads page
-images and is slow on a CPU, so docpipe uses it only where it has to.
+[IndicOCR](https://huggingface.co/bodhan-ai/indic-ocr), which reads English and 22 Indian languages. IndicOCR only
+reads page images and is slow on a CPU, so docpipe uses it only where it has to.
 
-**Built with IndicOCR from Bodhan AI / AI4Bharat.**
+> **Built with IndicOCR from Bodhan AI / AI4Bharat.**
 
-Everything runs on your machine. Processing makes no network calls (the Hugging Face libraries are forced offline), and
-there is no server: the IndicOCR license forbids hosting the model for third parties without Bodhan AI's written approval.
+Everything runs on your machine. Processing makes no network calls (the Hugging Face libraries are forced offline),
+and there is no server: the IndicOCR license forbids hosting the model for third parties without Bodhan AI's written
+approval.
+
+## Contents
+
+- [Install (Windows, Python 3.11+)](#install-windows-python-311)
+- [Use](#use)
+- [LLM-as-judge](#llm-as-judge-optional-sends-images-to-the-anthropic-api)
+- [Input and output folders](#input-and-output-folders)
+- [Output](#output)
+- [Supported formats](#supported-formats)
+- [The PDF text-layer decision](#the-pdf-text-layer-decision)
+- [Measured on this machine](#measured-on-this-machine)
+- [Known limits](#known-limits)
+- [Tests](#tests)
+- [License and attribution](#license-and-attribution)
 
 ## Install (Windows, Python 3.11+)
 
@@ -85,20 +100,27 @@ docpipe process pdfs\ --out out\ --deterministic
 docpipe judge out\ --pdfs pdfs\ --pages-per-pdf 3
 ```
 
-For each PDF, `judge` picks up to 3 OCR pages spread evenly (first, middle, last), sends the page image and IndicOCR's text to
-Claude Sonnet 5, and writes `judge_report.json` (default `output\judge_output\`). `how_to_read` and `overall_summary` come
-first, and the OVERALL result is also printed to the console. Field names say what they are:
-  `llm_quality_rating_out_of_10` (1 = unusable, 10 = perfect; averaged as `average_llm_quality_rating_out_of_10`),
-  `llm_verdict` (good / acceptable / poor), `character_accuracy_percent`, `word_accuracy_percent` (and the matching
-  `*_error_rate_percent`), `reading_order_correct`, `text_on_page_missing_from_ocr`, `misread_text` (each item has
-  `ocr_text_says` and `page_actually_says`), `text_in_ocr_but_not_on_page`, `llm_judge_comments`, `llm_transcription`,
-  and per call `llm_call_latency_seconds`, `llm_input_tokens`, `llm_output_tokens`. The structure is `judge_model_name`,
-  `max_pages_judged_per_pdf`, `overall_summary`, then `pdfs[]` with `pdf_name`, `source_pdf_path`, `total_ocr_pages_in_pdf`,
-  `judged_pages[]` (each with `page_number`) and, on failure, `error_message`.
+For each PDF, `judge` picks up to 3 OCR pages spread evenly (first, middle, last), sends the page image and IndicOCR's
+text to Claude Sonnet 5, and writes `judge_report.json` (default `output\judge_output\`). `how_to_read` and
+`overall_summary` come first in the file, and the OVERALL result is also printed to the console.
 
-Accuracy percentages are measured against the LLM's own transcription, not human ground truth. It needs `pip install anthropic` and
-`ANTHROPIC_API_KEY` in the environment. **Page images leave your machine**: use it only on non-sensitive documents. The judge
-is an LLM, not ground truth; spot-check its verdicts, especially for Hindi and Urdu.
+Report structure: `judge_model_name`, `max_pages_judged_per_pdf`, `overall_summary`, then `pdfs[]` with `pdf_name`,
+`source_pdf_path`, `total_ocr_pages_in_pdf`, `judged_pages[]` (each with `page_number`) and, on failure,
+`error_message`. Field names in each judged page say what they are:
+
+- `llm_quality_rating_out_of_10` — 1 (unusable) to 10 (perfect); averaged as `average_llm_quality_rating_out_of_10`
+- `llm_verdict` — `good` / `acceptable` / `poor`
+- `character_accuracy_percent`, `word_accuracy_percent` — and the matching `*_error_rate_percent`
+- `reading_order_correct`
+- `text_on_page_missing_from_ocr`
+- `misread_text` — each item has `ocr_text_says` and `page_actually_says`
+- `text_in_ocr_but_not_on_page`
+- `llm_judge_comments`, `llm_transcription`
+- `llm_call_latency_seconds`, `llm_input_tokens`, `llm_output_tokens` — per call
+
+Accuracy percentages are measured against the LLM's own transcription, not human ground truth. It needs
+`pip install anthropic` and `ANTHROPIC_API_KEY` in the environment. **Page images leave your machine**: use it only on
+non-sensitive documents. The judge is an LLM, not ground truth; spot-check its verdicts, especially for Hindi and Urdu.
 
 As a library: `from docpipe.pipeline import process_batch; from docpipe.config import Options`.
 
@@ -117,10 +139,9 @@ Both folders are tracked by git through a `.gitkeep`; their contents are ignored
 
 ## Output
 
-For an input named `report.pdf`, `out\report.pdf\` contains only `document.json` (the folder is named after the full file name so that `a.pdf`
-and `a.docx` do not collide):
-
-- **`document.json`**: UTF-8, Unicode kept as characters (`ensure_ascii=False`).
+For an input named `report.pdf`, `out\report.pdf\` contains only `document.json` (the folder is named after the full
+file name so that `a.pdf` and `a.docx` do not collide). It is UTF-8, with Unicode kept as characters
+(`ensure_ascii=False`).
 
 | top-level field | meaning |
 |---|---|
@@ -222,5 +243,3 @@ internal use is free; hosting it for third parties needs Bodhan AI's prior writt
 section 10 apply to everyone. Personal data in your documents remains your responsibility under India's DPDP Act.
 
 **Built with IndicOCR from Bodhan AI / AI4Bharat.** (Also printed by `docpipe --version` and stored in every `document.json`.)
-#   I n d i c O C R _ I m p l e m e n t a t i o n  
- 
